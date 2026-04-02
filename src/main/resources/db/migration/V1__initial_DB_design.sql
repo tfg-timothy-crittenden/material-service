@@ -1,0 +1,408 @@
+
+CREATE TABLE IF NOT EXISTS exam_family (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code            VARCHAR(50)  NOT NULL UNIQUE,
+    name            VARCHAR(150) NOT NULL,
+    description     TEXT,
+
+    version         BIGINT       NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- CREATE TABLE skill (
+--     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     code            VARCHAR(50)  NOT NULL UNIQUE,
+--     name            VARCHAR(150) NOT NULL,
+--     description     TEXT,
+--
+--     version         BIGINT       NOT NULL DEFAULT 0,
+--     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+-- );
+--
+-- CREATE TABLE task_type (
+--     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     code            VARCHAR(100) NOT NULL UNIQUE,
+--     name            VARCHAR(200) NOT NULL,
+--     exam_family_id  UUID REFERENCES exam_family(id) ON DELETE SET NULL,
+--     skill_id        UUID REFERENCES skill(id) ON DELETE SET NULL,
+--     description     TEXT,
+--     config_schema   JSONB        NOT NULL DEFAULT '{}'::jsonb,
+--
+--     version         BIGINT       NOT NULL DEFAULT 0,
+--     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+-- );
+--
+-- -- =========================================================
+-- -- Exam blueprint
+-- -- Reusable exam structure/template
+-- -- =========================================================
+-- CREATE TABLE exam_blueprint (
+--     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     exam_family_id  UUID         NOT NULL REFERENCES exam_family(id) ON DELETE RESTRICT,
+--     code            VARCHAR(100) NOT NULL UNIQUE,
+--     name            VARCHAR(200) NOT NULL,
+--     version_no      INTEGER      NOT NULL CHECK (version_no > 0),
+--     is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
+--
+--     version         BIGINT       NOT NULL DEFAULT 0,
+--     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--
+--     CONSTRAINT uq_exam_blueprint_family_name_version
+--         UNIQUE (exam_family_id, name, version_no)
+-- );
+--
+-- CREATE TABLE exam_blueprint_node (
+--     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     blueprint_id                UUID         NOT NULL REFERENCES exam_blueprint(id) ON DELETE CASCADE,
+--     parent_node_id              UUID         REFERENCES exam_blueprint_node(id) ON DELETE CASCADE,
+--
+--     kind                        VARCHAR(30)  NOT NULL,
+--     code                        VARCHAR(100) NOT NULL,
+--     title                       VARCHAR(250) NOT NULL,
+--     display_order               INTEGER      NOT NULL CHECK (display_order >= 0),
+--
+--     skill_id                    UUID         REFERENCES skill(id) ON DELETE SET NULL,
+--     task_type_id                UUID         REFERENCES task_type(id) ON DELETE SET NULL,
+--
+--     is_required                 BOOLEAN      NOT NULL DEFAULT TRUE,
+--     min_children                INTEGER      CHECK (min_children IS NULL OR min_children >= 0),
+--     max_children                INTEGER      CHECK (max_children IS NULL OR max_children >= 0),
+--
+--     default_time_limit_seconds  INTEGER      CHECK (default_time_limit_seconds IS NULL OR default_time_limit_seconds >= 0),
+--     default_prep_time_seconds   INTEGER      CHECK (default_prep_time_seconds IS NULL OR default_prep_time_seconds >= 0),
+--
+--     config                      JSONB        NOT NULL DEFAULT '{}'::jsonb,
+--
+--     version                     BIGINT       NOT NULL DEFAULT 0,
+--     created_at                  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at                  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--
+--     CONSTRAINT chk_exam_blueprint_node_kind
+--         CHECK (kind IN ('EXAM', 'SECTION', 'PART', 'TASK_GROUP', 'TASK', 'ITEM')),
+--
+--     CONSTRAINT chk_exam_blueprint_node_child_bounds
+--         CHECK (
+--             min_children IS NULL
+--             OR max_children IS NULL
+--             OR min_children <= max_children
+--         ),
+--
+--     CONSTRAINT uq_exam_blueprint_node_code
+--         UNIQUE (blueprint_id, code),
+--
+--     CONSTRAINT uq_exam_blueprint_node_sibling_order
+--         UNIQUE (blueprint_id, parent_node_id, display_order)
+-- );
+--
+-- CREATE UNIQUE INDEX uq_exam_blueprint_root_order
+--     ON exam_blueprint_node (blueprint_id, display_order)
+--     WHERE parent_node_id IS NULL;
+--
+-- -- =========================================================
+-- -- Material
+-- -- Concrete authored content
+-- -- =========================================================
+-- CREATE TABLE material (
+--     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     exam_family_id  UUID         NOT NULL REFERENCES exam_family(id) ON DELETE RESTRICT,
+--     blueprint_id    UUID         REFERENCES exam_blueprint(id) ON DELETE SET NULL,
+--
+--     code            VARCHAR(100) NOT NULL UNIQUE,
+--     title           VARCHAR(250) NOT NULL,
+--     description     TEXT,
+--
+--     author_id       UUID,
+--     owner_org_id    UUID,
+--
+--     version         BIGINT       NOT NULL DEFAULT 0,
+--     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+-- );
+--
+-- CREATE TABLE material_version (
+--     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     material_id         UUID         NOT NULL REFERENCES material(id) ON DELETE CASCADE,
+--     version_no          INTEGER      NOT NULL CHECK (version_no > 0),
+--     status              VARCHAR(30)  NOT NULL,
+--     change_summary      TEXT,
+--     created_by          UUID,
+--     published_at        TIMESTAMPTZ,
+--     blueprint_snapshot  JSONB,
+--     is_locked           BOOLEAN      NOT NULL DEFAULT FALSE,
+--
+--     version             BIGINT       NOT NULL DEFAULT 0,
+--     created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--
+--     CONSTRAINT chk_material_version_status
+--         CHECK (status IN ('DRAFT', 'REVIEW', 'PUBLISHED', 'ARCHIVED')),
+--
+--     CONSTRAINT chk_material_version_published_at
+--         CHECK (
+--             status <> 'PUBLISHED'
+--             OR published_at IS NOT NULL
+--         ),
+--
+--     CONSTRAINT uq_material_version
+--         UNIQUE (material_id, version_no)
+-- );
+--
+-- -- =========================================================
+-- -- Material nodes
+-- -- Core content tree
+-- -- Response/scoring essentials are inlined here for v1
+-- -- =========================================================
+-- CREATE TABLE material_node (
+--     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     material_version_id     UUID         NOT NULL REFERENCES material_version(id) ON DELETE CASCADE,
+--     parent_node_id          UUID         REFERENCES material_node(id) ON DELETE CASCADE,
+--     blueprint_node_id       UUID         REFERENCES exam_blueprint_node(id) ON DELETE SET NULL,
+--
+--     kind                    VARCHAR(30)  NOT NULL,
+--     code                    VARCHAR(100) NOT NULL,
+--     title                   VARCHAR(250),
+--     display_order           INTEGER      NOT NULL CHECK (display_order >= 0),
+--
+--     skill_id                UUID         REFERENCES skill(id) ON DELETE SET NULL,
+--     task_type_id            UUID         REFERENCES task_type(id) ON DELETE SET NULL,
+--
+--     instructions            TEXT,
+--     stimulus_text           TEXT,
+--     transcript_text         TEXT,
+--     explanation_text        TEXT,
+--
+--     time_limit_seconds      INTEGER      CHECK (time_limit_seconds IS NULL OR time_limit_seconds >= 0),
+--     prep_time_seconds       INTEGER      CHECK (prep_time_seconds IS NULL OR prep_time_seconds >= 0),
+--
+--     response_mode           VARCHAR(30)  NOT NULL DEFAULT 'NONE',
+--     response_required       BOOLEAN      NOT NULL DEFAULT TRUE,
+--     min_duration_seconds    INTEGER      CHECK (min_duration_seconds IS NULL OR min_duration_seconds >= 0),
+--     max_duration_seconds    INTEGER      CHECK (max_duration_seconds IS NULL OR max_duration_seconds >= 0),
+--     min_word_count          INTEGER      CHECK (min_word_count IS NULL OR min_word_count >= 0),
+--     max_word_count          INTEGER      CHECK (max_word_count IS NULL OR max_word_count >= 0),
+--
+--     scoring_mode            VARCHAR(30)  NOT NULL DEFAULT 'NONE',
+--     max_score               NUMERIC(8,2),
+--     passing_score           NUMERIC(8,2),
+--
+--     config                  JSONB        NOT NULL DEFAULT '{}'::jsonb,
+--
+--     version                 BIGINT       NOT NULL DEFAULT 0,
+--     created_at              TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at              TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--
+--     CONSTRAINT chk_material_node_kind
+--         CHECK (kind IN ('EXAM', 'SECTION', 'PART', 'TASK_GROUP', 'TASK', 'ITEM')),
+--
+--     CONSTRAINT chk_material_node_response_mode
+--         CHECK (response_mode IN (
+--             'SPOKEN',
+--             'FREE_TEXT',
+--             'SHORT_TEXT',
+--             'MULTIPLE_CHOICE',
+--             'MULTI_SELECT',
+--             'ESSAY',
+--             'FILE_UPLOAD',
+--             'NONE'
+--         )),
+--
+--     CONSTRAINT chk_material_node_scoring_mode
+--         CHECK (scoring_mode IN (
+--             'NONE',
+--             'MANUAL',
+--             'AUTO',
+--             'HYBRID',
+--             'RUBRIC'
+--         )),
+--
+--     CONSTRAINT chk_material_node_duration_bounds
+--         CHECK (
+--             min_duration_seconds IS NULL
+--             OR max_duration_seconds IS NULL
+--             OR min_duration_seconds <= max_duration_seconds
+--         ),
+--
+--     CONSTRAINT chk_material_node_word_bounds
+--         CHECK (
+--             min_word_count IS NULL
+--             OR max_word_count IS NULL
+--             OR min_word_count <= max_word_count
+--         ),
+--
+--     CONSTRAINT uq_material_node_code
+--         UNIQUE (material_version_id, code),
+--
+--     CONSTRAINT uq_material_node_sibling_order
+--         UNIQUE (material_version_id, parent_node_id, display_order)
+-- );
+--
+-- CREATE UNIQUE INDEX uq_material_node_root_order
+--     ON material_node (material_version_id, display_order)
+--     WHERE parent_node_id IS NULL;
+--
+-- -- =========================================================
+-- -- Assets
+-- -- =========================================================
+-- CREATE TABLE material_asset (
+--     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     material_node_id    UUID         NOT NULL REFERENCES material_node(id) ON DELETE CASCADE,
+--
+--     kind                VARCHAR(30)  NOT NULL,
+--     storage_key         VARCHAR(500) NOT NULL,
+--     original_filename   VARCHAR(255),
+--     mime_type           VARCHAR(150),
+--     file_size_bytes     BIGINT       CHECK (file_size_bytes IS NULL OR file_size_bytes >= 0),
+--
+--     title               VARCHAR(250),
+--     transcript_text     TEXT,
+--     display_order       INTEGER      NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+--     metadata            JSONB        NOT NULL DEFAULT '{}'::jsonb,
+--
+--     version             BIGINT       NOT NULL DEFAULT 0,
+--     created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--
+--     CONSTRAINT chk_material_asset_kind
+--         CHECK (kind IN ('TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'PDF', 'OTHER'))
+-- );
+--
+-- -- =========================================================
+-- -- Rubrics
+-- -- =========================================================
+-- CREATE TABLE rubric (
+--     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     material_version_id UUID         NOT NULL REFERENCES material_version(id) ON DELETE CASCADE,
+--     material_node_id    UUID         REFERENCES material_node(id) ON DELETE CASCADE,
+--
+--     code                VARCHAR(100) NOT NULL,
+--     title               VARCHAR(250) NOT NULL,
+--     description         TEXT,
+--
+--     version             BIGINT       NOT NULL DEFAULT 0,
+--     created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--
+--     CONSTRAINT uq_rubric_code
+--         UNIQUE (material_version_id, code)
+-- );
+--
+-- CREATE TABLE rubric_criterion (
+--     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     rubric_id       UUID         NOT NULL REFERENCES rubric(id) ON DELETE CASCADE,
+--     code            VARCHAR(100) NOT NULL,
+--     name            VARCHAR(200) NOT NULL,
+--     description     TEXT,
+--     weight          NUMERIC(8,3),
+--     display_order   INTEGER      NOT NULL CHECK (display_order >= 0),
+--
+--     version         BIGINT       NOT NULL DEFAULT 0,
+--     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--
+--     CONSTRAINT uq_rubric_criterion_code
+--         UNIQUE (rubric_id, code),
+--
+--     CONSTRAINT uq_rubric_criterion_order
+--         UNIQUE (rubric_id, display_order)
+-- );
+--
+-- CREATE TABLE rubric_band (
+--     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     criterion_id    UUID         NOT NULL REFERENCES rubric_criterion(id) ON DELETE CASCADE,
+--     band_value      VARCHAR(50)  NOT NULL,
+--     short_label     VARCHAR(100),
+--     descriptor      TEXT         NOT NULL,
+--     score           NUMERIC(8,2),
+--     display_order   INTEGER      NOT NULL CHECK (display_order >= 0),
+--
+--     version         BIGINT       NOT NULL DEFAULT 0,
+--     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+--
+--     CONSTRAINT uq_rubric_band_value
+--         UNIQUE (criterion_id, band_value),
+--
+--     CONSTRAINT uq_rubric_band_order
+--         UNIQUE (criterion_id, display_order)
+-- );
+--
+-- -- =========================================================
+-- -- Indexes
+-- -- =========================================================
+-- CREATE INDEX idx_task_type_exam_family
+--     ON task_type (exam_family_id);
+--
+-- CREATE INDEX idx_task_type_skill
+--     ON task_type (skill_id);
+--
+-- CREATE INDEX idx_exam_blueprint_exam_family
+--     ON exam_blueprint (exam_family_id);
+--
+-- CREATE INDEX idx_exam_blueprint_node_blueprint
+--     ON exam_blueprint_node (blueprint_id);
+--
+-- CREATE INDEX idx_exam_blueprint_node_parent
+--     ON exam_blueprint_node (parent_node_id);
+--
+-- CREATE INDEX idx_exam_blueprint_node_skill
+--     ON exam_blueprint_node (skill_id);
+--
+-- CREATE INDEX idx_exam_blueprint_node_task_type
+--     ON exam_blueprint_node (task_type_id);
+--
+-- CREATE INDEX idx_exam_blueprint_node_config_gin
+--     ON exam_blueprint_node USING GIN (config);
+--
+-- CREATE INDEX idx_material_exam_family
+--     ON material (exam_family_id);
+--
+-- CREATE INDEX idx_material_blueprint
+--     ON material (blueprint_id);
+--
+-- CREATE INDEX idx_material_version_material
+--     ON material_version (material_id);
+--
+-- CREATE INDEX idx_material_version_status
+--     ON material_version (status);
+--
+-- CREATE INDEX idx_material_node_version
+--     ON material_node (material_version_id);
+--
+-- CREATE INDEX idx_material_node_parent
+--     ON material_node (parent_node_id);
+--
+-- CREATE INDEX idx_material_node_blueprint_node
+--     ON material_node (blueprint_node_id);
+--
+-- CREATE INDEX idx_material_node_skill
+--     ON material_node (skill_id);
+--
+-- CREATE INDEX idx_material_node_task_type
+--     ON material_node (task_type_id);
+--
+-- CREATE INDEX idx_material_node_config_gin
+--     ON material_node USING GIN (config);
+--
+-- CREATE INDEX idx_material_asset_material_node
+--     ON material_asset (material_node_id);
+--
+-- CREATE INDEX idx_material_asset_metadata_gin
+--     ON material_asset USING GIN (metadata);
+--
+-- CREATE INDEX idx_rubric_material_version
+--     ON rubric (material_version_id);
+--
+-- CREATE INDEX idx_rubric_material_node
+--     ON rubric (material_node_id);
+--
+-- CREATE INDEX idx_rubric_criterion_rubric
+--     ON rubric_criterion (rubric_id);
+--
+-- CREATE INDEX idx_rubric_band_criterion
+--     ON rubric_band (criterion_id);
+--
+-- COMMIT;
