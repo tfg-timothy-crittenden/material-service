@@ -13,11 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 // and the @Transactional annotations ensure methods run inside a transactional context.
 
 @Service
-public class TestServiceAdapter implements ExamFamilyUseCase {
+public class ExamFamilyServiceAdapter implements ExamFamilyUseCase {
 
     private final ExamFamilyUseCaseService delegate;
 
-    public TestServiceAdapter(ExamFamilyRepositoryPort repository) {
+    public ExamFamilyServiceAdapter(ExamFamilyRepositoryPort repository) {
         this.delegate = new ExamFamilyUseCaseService(repository);
     }
 
