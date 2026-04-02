@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.util.Map;
 
@@ -22,5 +24,13 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
-}
 
+    @ExceptionHandler({ObjectOptimisticLockingFailureException.class, OptimisticLockingFailureException.class})
+    public ResponseEntity<Map<String, Object>> handleOptimisticLocking(Exception ex) {
+        Map<String, Object> body = Map.of(
+                "message", "This item was updated by someone else while you were editing. Please refresh to see the latest version and try again.",
+                "error", "Conflict"
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+}

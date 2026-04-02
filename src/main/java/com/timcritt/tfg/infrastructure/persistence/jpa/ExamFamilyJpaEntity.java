@@ -36,6 +36,7 @@ public class ExamFamilyJpaEntity {
     private String description;
 
     @NotNull
+    @Version
     @ColumnDefault("0")
     @Column(name = "version", nullable = false)
     private Long version;

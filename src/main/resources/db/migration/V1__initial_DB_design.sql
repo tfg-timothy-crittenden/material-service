@@ -1,6 +1,6 @@
 
 CREATE TABLE IF NOT EXISTS exam_family (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id              BIGINT PRIMARY KEY,
     code            VARCHAR(50)  NOT NULL UNIQUE,
     name            VARCHAR(150) NOT NULL,
     description     TEXT,

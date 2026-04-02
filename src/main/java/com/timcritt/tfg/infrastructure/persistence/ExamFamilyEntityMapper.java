@@ -13,6 +13,7 @@ public class ExamFamilyEntityMapper {
         domain.setDescription(entity.getDescription());
         domain.setUpdatedAt(entity.getUpdatedAt());
         domain.setCreatedAt(entity.getCreatedAt());
+        domain.setVersion(entity.getVersion());
         return domain;
     }
 
@@ -24,6 +25,7 @@ public class ExamFamilyEntityMapper {
         entity.setDescription(domain.getDescription());
         entity.setUpdatedAt(domain.getUpdatedAt());
         entity.setCreatedAt(domain.getCreatedAt());
+        entity.setVersion(domain.getVersion());
         return entity;
     }
 
