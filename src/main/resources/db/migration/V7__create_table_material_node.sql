@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS material_node (
     max_score               NUMERIC(8,2),
     passing_score           NUMERIC(8,2),
 
-    config                  JSONB        NOT NULL DEFAULT '{}'::jsonb,
+    config                  JSONB        DEFAULT '{}'::jsonb NOT NULL ,
 
     version                 BIGINT       NOT NULL DEFAULT 0,
     created_at              TIMESTAMPTZ  NOT NULL DEFAULT now(),
