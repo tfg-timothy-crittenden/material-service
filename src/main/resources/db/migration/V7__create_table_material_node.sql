@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS material_node (
     prep_time_seconds       INTEGER      CHECK (prep_time_seconds IS NULL OR prep_time_seconds >= 0),
 
     response_mode           VARCHAR(30)  NOT NULL DEFAULT 'NONE',
-    response_required       BOOLEAN      NOT NULL DEFAULT TRUE,
+    response_required       BOOLEAN      NOT NULL DEFAULT true,
     min_duration_seconds    INTEGER      CHECK (min_duration_seconds IS NULL OR min_duration_seconds >= 0),
     max_duration_seconds    INTEGER      CHECK (max_duration_seconds IS NULL OR max_duration_seconds >= 0),
     min_word_count          INTEGER      CHECK (min_word_count IS NULL OR min_word_count >= 0),
