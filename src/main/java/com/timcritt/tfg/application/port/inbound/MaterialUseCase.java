@@ -1,5 +1,6 @@
 package com.timcritt.tfg.application.port.inbound;
 import com.timcritt.tfg.domain.model.Material;
+import java.util.List;
 import java.util.Optional;
 
 public interface MaterialUseCase {
@@ -7,5 +8,5 @@ public interface MaterialUseCase {
     Optional<Material> findMaterialById(Long id);
     Material updateMaterial(Material material);
     Boolean deleteMaterial(Long id);
+    List<Material> findByExamFamilyId(Long examFamilyId);
 }
-

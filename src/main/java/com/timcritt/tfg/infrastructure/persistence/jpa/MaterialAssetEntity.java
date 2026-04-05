@@ -1,5 +1,6 @@
 package com.timcritt.tfg.infrastructure.persistence.jpa;
 
+import com.timcritt.tfg.infrastructure.persistence.auxiliary.JsonbConverter;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -15,6 +16,7 @@ import lombok.Builder;
 @AllArgsConstructor
 @Builder
 public class MaterialAssetEntity {
+
     @Id
     private Long id;
 

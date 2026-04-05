@@ -1,4 +1,4 @@
-package com.timcritt.tfg.application.service;
+package com.timcritt.tfg.application.service.single;
 
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialNode;
@@ -31,5 +31,12 @@ public class MaterialNodeUseCaseService {
     public void delete(Long id) {
         repository.deleteById(id);
     }
-}
 
+    public List<MaterialNode> findByKind(String kind) {
+        return repository.findByKind(kind);
+    }
+
+    public List<MaterialNode> findByKindAndExamFamilyIdAndSkillId(String kind, Long examFamilyId, Long skillId) {
+        return repository.findByKindAndExamFamilyIdAndSkillId(kind, examFamilyId, skillId);
+    }
+}

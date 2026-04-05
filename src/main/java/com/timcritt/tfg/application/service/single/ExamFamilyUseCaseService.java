@@ -1,4 +1,4 @@
-package com.timcritt.tfg.application.service;
+package com.timcritt.tfg.application.service.single;
 
 import com.timcritt.tfg.application.port.inbound.ExamFamilyUseCase;
 import com.timcritt.tfg.application.port.outbound.ExamFamilyRepositoryPort;

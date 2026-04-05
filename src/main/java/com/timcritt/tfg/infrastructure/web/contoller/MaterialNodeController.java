@@ -1,13 +1,9 @@
 package com.timcritt.tfg.infrastructure.web.contoller;
 
-import com.timcritt.tfg.application.port.inbound.MaterialAssetUseCase;
-import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.MaterialNode;
-import com.timcritt.tfg.infrastructure.service.MaterialNodeServiceAdapter;
-import com.timcritt.tfg.infrastructure.web.dto.MaterialAssetDto;
+import com.timcritt.tfg.infrastructure.service.single.MaterialNodeServiceAdapter;
 import com.timcritt.tfg.infrastructure.web.dto.MaterialNodeDto;
 import com.timcritt.tfg.infrastructure.web.dtoMapper.MaterialNodeDtoMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -53,23 +49,19 @@ public class MaterialNodeController {
         return ResponseEntity.noContent().build();
     }
 
-    @RestController
-    @RequestMapping("/api/material-assets")
-    public static class MaterialAssetController {
-        @Autowired
-        private MaterialAssetUseCase useCase;
+    @GetMapping("/kind/{kind}")
+    public List<MaterialNodeDto> getByKind(@PathVariable String kind) {
+        return service.findByKind(kind).stream().map(MaterialNodeDtoMapper::toDto).collect(Collectors.toList());
+    }
 
-        @GetMapping("/{id}")
-        public MaterialAssetDto getById(@PathVariable Long id) {
-            Optional<MaterialAsset> asset = useCase.getById(id);
-            return asset.map(MaterialAssetDto::fromDomain).orElse(null);
-        }
-
-        @PostMapping
-        public MaterialAssetDto create(@RequestBody MaterialAssetDto dto) {
-            MaterialAsset saved = useCase.save(dto.toDomain());
-            return MaterialAssetDto.fromDomain(saved);
-        }
+    @GetMapping("/search")
+    public List<MaterialNodeDto> getByKindExamFamilyAndSkill(
+            @RequestParam String kind,
+            @RequestParam Long examFamilyId,
+            @RequestParam(required = false) Long skillId) {
+        return service.findByKindAndExamFamilyIdAndSkillId(kind, examFamilyId, skillId)
+                .stream()
+                .map(MaterialNodeDtoMapper::toDto)
+                .collect(Collectors.toList());
     }
 }
-

@@ -1,7 +1,8 @@
-package com.timcritt.tfg.application.service;
+package com.timcritt.tfg.application.service.single;
 import com.timcritt.tfg.application.port.inbound.MaterialUseCase;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
 import com.timcritt.tfg.domain.model.Material;
+import java.util.List;
 import java.util.Optional;
 
 public class MaterialUseCaseService implements MaterialUseCase {
@@ -25,5 +26,8 @@ public class MaterialUseCaseService implements MaterialUseCase {
     public Boolean deleteMaterial(Long id) {
         return repository.delete(id);
     }
+    @Override
+    public List<Material> findByExamFamilyId(Long examFamilyId) {
+        return repository.findByExamFamilyId(examFamilyId);
+    }
 }
-

@@ -1,4 +1,4 @@
-CREATE TABLE material_asset (
+CREATE TABLE IF NOT EXISTS material_asset (
     id                  BIGINT PRIMARY KEY,
     material_node_id    BIGINT         NOT NULL REFERENCES material_node(id) ON DELETE CASCADE,
 

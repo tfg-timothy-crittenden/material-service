@@ -1,4 +1,4 @@
-package com.timcritt.tfg.infrastructure.persistence.jpa;
+package com.timcritt.tfg.infrastructure.persistence.auxiliary;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

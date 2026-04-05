@@ -5,6 +5,7 @@ import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialJpaEntity;
 import com.timcritt.tfg.infrastructure.persistence.mapper.MaterialEntityMapper;
 import com.timcritt.tfg.infrastructure.persistence.spring.MaterialJpaRepository;
 import org.springframework.stereotype.Repository;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -31,5 +32,11 @@ public class MaterialRepositoryAdapter implements MaterialRepositoryPort {
         repository.deleteById(id);
         return true;
     }
+    @Override
+    public List<Material> findByExamFamilyId(Long examFamilyId) {
+        return repository.findByExamFamilyId(examFamilyId)
+                .stream()
+                .map(MaterialEntityMapper::toDomain)
+                .toList();
+    }
 }
-

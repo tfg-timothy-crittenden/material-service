@@ -4,6 +4,8 @@ import lombok.*;
 import java.time.Instant;
 import java.util.Map;
 
+//Represents a section, subsection, part or question of an exam
+
 @Data
 @Builder
 @NoArgsConstructor

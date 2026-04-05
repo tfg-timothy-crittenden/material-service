@@ -1,6 +1,6 @@
 package com.timcritt.tfg.infrastructure.persistence.jpa;
 
-import com.timcritt.tfg.infrastructure.persistence.jpa.MapToJsonConverter;
+import com.timcritt.tfg.infrastructure.persistence.auxiliary.MapToJsonConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
@@ -16,9 +16,6 @@ public class MaterialNodeJpaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "material_version_id", nullable = false)
-    private Long materialVersionId;
 
     @Column(name = "parent_node_id")
     private Long parentNodeId;
@@ -102,4 +99,3 @@ public class MaterialNodeJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 }
-

@@ -1,8 +1,8 @@
-package com.timcritt.tfg.infrastructure.service;
+package com.timcritt.tfg.infrastructure.service.single;
 
 import com.timcritt.tfg.application.port.inbound.ExamFamilyUseCase;
 import com.timcritt.tfg.application.port.outbound.ExamFamilyRepositoryPort;
-import com.timcritt.tfg.application.service.ExamFamilyUseCaseService;
+import com.timcritt.tfg.application.service.single.ExamFamilyUseCaseService;
 import com.timcritt.tfg.domain.model.ExamFamily;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

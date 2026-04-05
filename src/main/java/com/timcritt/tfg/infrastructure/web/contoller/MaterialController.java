@@ -4,6 +4,7 @@ import com.timcritt.tfg.infrastructure.web.dtoMapper.MaterialDtoMapper;
 import com.timcritt.tfg.infrastructure.web.dto.MaterialDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -35,5 +36,11 @@ public class MaterialController {
         useCase.deleteMaterial(id);
         return ResponseEntity.noContent().build();
     }
-}
+    @GetMapping("/by-exam-family/{examFamilyId}")
+    public ResponseEntity<List<MaterialDto>> getByExamFamily(@PathVariable Long examFamilyId) {
+        List<com.timcritt.tfg.domain.model.Material> materials = useCase.findByExamFamilyId(examFamilyId);
+        List<MaterialDto> dtos = materials.stream().map(MaterialDtoMapper::toDto).toList();
+        return ResponseEntity.ok(dtos);
+    }
 
+}

@@ -1,9 +1,7 @@
-CREATE TABLE material_node (
+CREATE TABLE IF NOT EXISTS material_node (
     id                      BIGINT PRIMARY KEY,
-    material_version_id     BIGINT         NOT NULL REFERENCES material_version(id) ON DELETE CASCADE,
     parent_node_id          BIGINT         REFERENCES material_node(id) ON DELETE CASCADE,
     blueprint_node_id       BIGINT         REFERENCES exam_blueprint_node(id) ON DELETE SET NULL,
-
     kind                    VARCHAR(30)  NOT NULL,
     code                    VARCHAR(100) NOT NULL,
     title                   VARCHAR(250),
@@ -43,13 +41,7 @@ CREATE TABLE material_node (
     CONSTRAINT chk_material_node_response_mode
         CHECK (response_mode IN (
             'SPOKEN',
-            'FREE_TEXT',
-            'SHORT_TEXT',
-            'MULTIPLE_CHOICE',
-            'MULTI_SELECT',
-            'ESSAY',
-            'FILE_UPLOAD',
-            'NONE'
+            'FILE_UPLOAD'
         )),
 
     CONSTRAINT chk_material_node_scoring_mode
@@ -75,9 +67,8 @@ CREATE TABLE material_node (
             OR min_word_count <= max_word_count
         ),
 
-    CONSTRAINT uq_material_node_code
-        UNIQUE (material_version_id, code),
-
     CONSTRAINT uq_material_node_sibling_order
-        UNIQUE (material_version_id, parent_node_id, display_order)
+        UNIQUE (parent_node_id, display_order)
 );
+-- Commented-out response modes for reference:
+-- 'FREE_TEXT', 'SHORT_TEXT', 'MULTIPLE_CHOICE', 'MULTI_SELECT', 'ESSAY', 'NONE'

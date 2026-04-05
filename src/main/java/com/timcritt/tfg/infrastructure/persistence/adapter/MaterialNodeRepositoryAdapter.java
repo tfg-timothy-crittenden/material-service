@@ -38,5 +38,36 @@ public class MaterialNodeRepositoryAdapter implements MaterialNodeRepositoryPort
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
     }
-}
 
+    @Override
+    public List<MaterialNode> findByParentNodeId(Long parentNodeId) {
+        return jpaRepository.findByParentNodeId(parentNodeId)
+                .stream()
+                .map(MaterialNodeEntityMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MaterialNode> findAllDescendantsByRootId(Long sectionId) {
+        return jpaRepository.findAllDescendantsByRootId(sectionId)
+                .stream()
+                .map(MaterialNodeEntityMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MaterialNode> findByKind(String kind) {
+        return jpaRepository.findByKind(kind)
+                .stream()
+                .map(MaterialNodeEntityMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MaterialNode> findByKindAndExamFamilyIdAndSkillId(String kind, Long examFamilyId, Long skillId) {
+        return jpaRepository.findByKindAndExamFamilyIdAndSkillId(kind, examFamilyId, skillId)
+                .stream()
+                .map(MaterialNodeEntityMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+}

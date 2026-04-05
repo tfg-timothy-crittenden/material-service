@@ -9,6 +9,7 @@ public class MaterialEntityMapper {
                 .id(entity.getId())
                 .examFamilyId(entity.getExamFamilyId())
                 .blueprintId(entity.getBlueprintId())
+                .materialNodeId(entity.getMaterialNodeId())
                 .code(entity.getCode())
                 .title(entity.getTitle())
                 .description(entity.getDescription())
@@ -25,6 +26,7 @@ public class MaterialEntityMapper {
                 .id(domain.getId())
                 .examFamilyId(domain.getExamFamilyId())
                 .blueprintId(domain.getBlueprintId())
+                .materialNodeId(domain.getMaterialNodeId())
                 .code(domain.getCode())
                 .title(domain.getTitle())
                 .description(domain.getDescription())
@@ -36,4 +38,3 @@ public class MaterialEntityMapper {
                 .build();
     }
 }
-

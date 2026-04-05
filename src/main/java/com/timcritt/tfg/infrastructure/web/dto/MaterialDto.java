@@ -18,5 +18,5 @@ public class MaterialDto {
     private Long version;
     private Instant createdAt;
     private Instant updatedAt;
+    private Long materialNodeId; // Link to root node
 }
-

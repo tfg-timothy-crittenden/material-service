@@ -1,6 +1,6 @@
-package com.timcritt.tfg.infrastructure.service;
+package com.timcritt.tfg.infrastructure.service.single;
 
-import com.timcritt.tfg.application.service.MaterialNodeUseCaseService;
+import com.timcritt.tfg.application.service.single.MaterialNodeUseCaseService;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialNode;
 import org.springframework.stereotype.Service;
@@ -40,5 +40,14 @@ public class MaterialNodeServiceAdapter {
     public void delete(Long id) {
         delegate.delete(id);
     }
-}
 
+    @Transactional(readOnly = true)
+    public List<MaterialNode> findByKind(String kind) {
+        return delegate.findByKind(kind);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MaterialNode> findByKindAndExamFamilyIdAndSkillId(String kind, Long examFamilyId, Long skillId) {
+        return delegate.findByKindAndExamFamilyIdAndSkillId(kind, examFamilyId, skillId);
+    }
+}

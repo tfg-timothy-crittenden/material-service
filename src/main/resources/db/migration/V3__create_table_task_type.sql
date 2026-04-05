@@ -1,4 +1,4 @@
-CREATE TABLE task_type (
+CREATE TABLE IF NOT EXISTS task_type (
     id              BIGINT PRIMARY KEY,
     code            VARCHAR(100) NOT NULL UNIQUE,
     name            VARCHAR(200) NOT NULL,

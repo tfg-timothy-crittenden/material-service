@@ -10,6 +10,7 @@ public final class MaterialDtoMapper {
                 .id(d.getId())
                 .examFamilyId(d.getExamFamilyId())
                 .blueprintId(d.getBlueprintId())
+                .materialNodeId(d.getMaterialNodeId())
                 .code(d.getCode())
                 .title(d.getTitle())
                 .description(d.getDescription())
@@ -26,6 +27,7 @@ public final class MaterialDtoMapper {
                 .id(dto.getId())
                 .examFamilyId(dto.getExamFamilyId())
                 .blueprintId(dto.getBlueprintId())
+                .materialNodeId(dto.getMaterialNodeId())
                 .code(dto.getCode())
                 .title(dto.getTitle())
                 .description(dto.getDescription())
@@ -37,4 +39,3 @@ public final class MaterialDtoMapper {
                 .build();
     }
 }
-

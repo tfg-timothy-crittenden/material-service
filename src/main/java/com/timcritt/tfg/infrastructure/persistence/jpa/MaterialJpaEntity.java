@@ -42,5 +42,7 @@ public class MaterialJpaEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-}
 
+    @Column(name = "material_node_id")
+    private Long materialNodeId;
+}

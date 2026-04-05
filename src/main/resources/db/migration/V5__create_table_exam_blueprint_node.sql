@@ -1,4 +1,4 @@
-CREATE TABLE exam_blueprint_node (
+CREATE TABLE IF NOT EXISTS exam_blueprint_node (
     id                          BIGINT PRIMARY KEY,
     blueprint_id                BIGINT         NOT NULL REFERENCES exam_blueprint(id) ON DELETE CASCADE,
     parent_node_id              BIGINT         REFERENCES exam_blueprint_node(id) ON DELETE CASCADE,

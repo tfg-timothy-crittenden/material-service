@@ -1,4 +1,4 @@
-CREATE TABLE exam_blueprint (
+CREATE TABLE IF NOT EXISTS exam_blueprint (
     id              BIGINT       PRIMARY KEY,
     exam_family_id  BIGINT       NOT NULL REFERENCES exam_family(id) ON DELETE RESTRICT,
     code            VARCHAR(100) NOT NULL UNIQUE,

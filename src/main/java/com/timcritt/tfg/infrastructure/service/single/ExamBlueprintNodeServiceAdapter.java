@@ -1,8 +1,8 @@
-package com.timcritt.tfg.infrastructure.service;
+package com.timcritt.tfg.infrastructure.service.single;
 
 import com.timcritt.tfg.application.port.inbound.ExamBlueprintNodeUseCase;
 import com.timcritt.tfg.application.port.outbound.ExamBlueprintNodeRepositoryPort;
-import com.timcritt.tfg.application.service.ExamBlueprintNodeUseCaseService;
+import com.timcritt.tfg.application.service.single.ExamBlueprintNodeUseCaseService;
 import com.timcritt.tfg.domain.model.ExamBlueprintNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

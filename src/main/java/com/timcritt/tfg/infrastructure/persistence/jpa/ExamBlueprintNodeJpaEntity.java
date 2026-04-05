@@ -1,5 +1,6 @@
 package com.timcritt.tfg.infrastructure.persistence.jpa;
 
+import com.timcritt.tfg.infrastructure.persistence.auxiliary.MapToJsonConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;

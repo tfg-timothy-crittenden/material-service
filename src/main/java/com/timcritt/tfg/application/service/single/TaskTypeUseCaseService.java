@@ -1,4 +1,4 @@
-package com.timcritt.tfg.application.service;
+package com.timcritt.tfg.application.service.single;
 
 import com.timcritt.tfg.application.port.inbound.TaskTypeUseCase;
 import com.timcritt.tfg.application.port.outbound.TaskTypeRepositoryPort;

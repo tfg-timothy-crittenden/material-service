@@ -1,8 +1,8 @@
-package com.timcritt.tfg.infrastructure.service;
+package com.timcritt.tfg.infrastructure.service.single;
 
 import com.timcritt.tfg.application.port.inbound.SkillUseCase;
 import com.timcritt.tfg.application.port.outbound.SkillRepositoryPort;
-import com.timcritt.tfg.application.service.SkillUseCaseService;
+import com.timcritt.tfg.application.service.single.SkillUseCaseService;
 import com.timcritt.tfg.domain.model.Skill;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

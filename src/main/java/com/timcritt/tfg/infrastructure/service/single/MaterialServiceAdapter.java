@@ -1,10 +1,12 @@
-package com.timcritt.tfg.infrastructure.service;
+package com.timcritt.tfg.infrastructure.service.single;
 import com.timcritt.tfg.application.port.inbound.MaterialUseCase;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
-import com.timcritt.tfg.application.service.MaterialUseCaseService;
+import com.timcritt.tfg.application.service.single.MaterialUseCaseService;
 import com.timcritt.tfg.domain.model.Material;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -33,5 +35,9 @@ public class MaterialServiceAdapter implements MaterialUseCase {
     public Boolean deleteMaterial(Long id) {
         return delegate.deleteMaterial(id);
     }
-}
 
+    @Override
+    public List<Material> findByExamFamilyId(Long examFamilyId) {
+        return delegate.findByExamFamilyId(examFamilyId);
+    }
+}
