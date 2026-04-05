@@ -25,10 +25,10 @@ COPY --from=build /app/target/*.jar app.jar
 # Service runs on 8082
 EXPOSE 8082
 
-# Defaults for Docker network (override if needed)
-ENV SERVER_PORT=8082
-ENV SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/classroom_db
-ENV SPRING_DATASOURCE_USERNAME=myuser
-ENV SPRING_DATASOURCE_PASSWORD=secret
+## Defaults for Docker network (override if needed)
+#ENV SERVER_PORT=8082
+#ENV SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/classroom_db
+#ENV SPRING_DATASOURCE_USERNAME=myuser
+#ENV SPRING_DATASOURCE_PASSWORD=secret
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
