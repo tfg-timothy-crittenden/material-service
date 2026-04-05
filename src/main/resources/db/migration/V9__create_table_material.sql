@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS material (
     blueprint_id    BIGINT         REFERENCES exam_blueprint(id) ON DELETE SET NULL,
     material_node_id BIGINT        REFERENCES material_node(id) ON DELETE SET NULL, -- Added link to root node
 
-    code            VARCHAR(100) NOT NULL UNIQUE,
+    code            VARCHAR(100) NOT NULL,
     title           VARCHAR(250) NOT NULL,
     description     TEXT,
 
