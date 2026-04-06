@@ -5,14 +5,15 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicInsert;
 
 @Entity
 @Table(name = "material_node", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_material_node_code", columnNames = {"code"}),
     @UniqueConstraint(name = "uq_material_node_sibling_order", columnNames = {"parent_node_id", "display_order"})
 })
 @Getter
 @Setter
+@DynamicInsert
 public class MaterialNodeEntity {
     @Id
     private Long id;
@@ -60,7 +61,7 @@ public class MaterialNodeEntity {
     private Integer prepTimeSeconds;
 
     @Column(name = "response_mode", nullable = false, length = 30)
-    private String responseMode = "NONE";
+    private String responseMode;
 
     @Column(name = "response_required", nullable = false)
     private Boolean responseRequired = true;
@@ -78,7 +79,7 @@ public class MaterialNodeEntity {
     private Integer maxWordCount;
 
     @Column(name = "scoring_mode", nullable = false, length = 30)
-    private String scoringMode = "NONE";
+    private String scoringMode;
 
     @Column(name = "max_score", precision = 8, scale = 2)
     private BigDecimal maxScore;
@@ -97,5 +98,13 @@ public class MaterialNodeEntity {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
-}
 
+    @PrePersist
+    public void prePersist() {
+        if (config == null) config = "{}";
+        if (responseRequired == null) responseRequired = true;
+        if (version == null) version = 0L;
+        if (createdAt == null) createdAt = OffsetDateTime.now();
+        if (updatedAt == null) updatedAt = OffsetDateTime.now();
+    }
+}
