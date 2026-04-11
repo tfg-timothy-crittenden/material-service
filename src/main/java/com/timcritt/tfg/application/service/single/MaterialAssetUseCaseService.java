@@ -7,6 +7,7 @@ import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -26,5 +27,9 @@ public class MaterialAssetUseCaseService implements MaterialAssetUseCase {
         nodeEntity.setId(asset.getMaterialNodeId());
         return repositoryAdapter.save(asset, nodeEntity);
     }
-}
 
+    @Override
+    public List<MaterialAsset> findByMaterialNodeId(Long materialNodeId) {
+        return repositoryAdapter.findByMaterialNodeId(materialNodeId);
+    }
+}

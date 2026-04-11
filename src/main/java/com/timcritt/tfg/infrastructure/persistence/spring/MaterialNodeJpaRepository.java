@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
+import java.util.Optional;
 
 public interface MaterialNodeJpaRepository extends JpaRepository<MaterialNodeJpaEntity, Long> {
     List<MaterialNodeJpaEntity> findByParentNodeId(Long parentNodeId);
@@ -32,4 +33,6 @@ public interface MaterialNodeJpaRepository extends JpaRepository<MaterialNodeJpa
           AND (:skillId IS NULL OR mn.skill_id = :skillId)
     """, nativeQuery = true)
     List<MaterialNodeJpaEntity> findByKindAndExamFamilyIdAndSkillId(@Param("kind") String kind, @Param("examFamilyId") Long examFamilyId, @Param("skillId") Long skillId);
+
+    Optional<MaterialNodeJpaEntity> findByParentNodeIdAndDisplayOrder(Long parentNodeId, Integer displayOrder);
 }

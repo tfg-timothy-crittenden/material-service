@@ -8,6 +8,7 @@ import com.timcritt.tfg.infrastructure.persistence.spring.MaterialAssetJpaReposi
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -22,6 +23,13 @@ public class MaterialAssetRepositoryAdapter {
     public MaterialAsset save(MaterialAsset asset, MaterialNodeEntity nodeEntity) {
         MaterialAssetEntity entity = MaterialAssetEntityMapper.toEntity(asset, nodeEntity);
         return MaterialAssetEntityMapper.toDomain(repository.save(entity));
+    }
+
+    public List<MaterialAsset> findByMaterialNodeId(Long materialNodeId) {
+        return repository.findByMaterialNode_Id(materialNodeId)
+                .stream()
+                .map(MaterialAssetEntityMapper::toDomain)
+                .toList();
     }
     // Add more methods as needed
 }

@@ -51,3 +51,100 @@ INSERT INTO material_node (
 )
 ON CONFLICT (id) DO UPDATE SET
     title=EXCLUDED.title, parent_node_id=EXCLUDED.parent_node_id, kind=EXCLUDED.kind, display_order=EXCLUDED.display_order, skill_id=EXCLUDED.skill_id, transcript_text=EXCLUDED.transcript_text, config=EXCLUDED.config, updated_at=now();
+
+-- Question 1
+INSERT INTO material_node (
+    id, parent_node_id, kind, code, title, display_order,
+    skill_id, instructions, transcript_text, response_mode, created_at, updated_at, config, version
+)
+VALUES (
+    11, 10, 'ITEM', 'INTERVIEW_QUESTION_1', 'Q1', 1,
+    4, NULL, 'Thank you for speaking with me today. Please think about the last time you read something that was important to you, such as a book, an article, a message, or some information for school or work. What were you reading, and why was it important to you?',
+    'SPOKEN', now(), now(), '{}'::jsonb, 0
+)
+ON CONFLICT (id) DO UPDATE SET
+    parent_node_id=EXCLUDED.parent_node_id,
+    kind=EXCLUDED.kind,
+    code=EXCLUDED.code,
+    title=EXCLUDED.title,
+    display_order=EXCLUDED.display_order,
+    skill_id=EXCLUDED.skill_id,
+    instructions=EXCLUDED.instructions,
+    transcript_text=EXCLUDED.transcript_text,
+    response_mode=EXCLUDED.response_mode,
+    config=EXCLUDED.config,
+    version=EXCLUDED.version,
+    updated_at=now();
+
+-- Question 2
+INSERT INTO material_node (
+    id, parent_node_id, kind, code, title, display_order,
+    skill_id, instructions, transcript_text, response_mode, created_at, updated_at, config, version
+)
+VALUES (
+    12, 10, 'ITEM', 'INTERVIEW_QUESTION_2', 'Q2', 2,
+    4, NULL, 'People have very different reading habits in daily life. Some people read a little every day, while others only read when they need information. What are your reading habits usually like, and why do you think they developed that way?',
+    'SPOKEN', now(), now(), '{}'::jsonb, 0
+)
+ON CONFLICT (id) DO UPDATE SET
+    parent_node_id=EXCLUDED.parent_node_id,
+    kind=EXCLUDED.kind,
+    code=EXCLUDED.code,
+    title=EXCLUDED.title,
+    display_order=EXCLUDED.display_order,
+    skill_id=EXCLUDED.skill_id,
+    instructions=EXCLUDED.instructions,
+    transcript_text=EXCLUDED.transcript_text,
+    response_mode=EXCLUDED.response_mode,
+    config=EXCLUDED.config,
+    version=EXCLUDED.version,
+    updated_at=now();
+
+-- Question 3
+INSERT INTO material_node (
+    id, parent_node_id, kind, code, title, display_order,
+    skill_id, instructions, transcript_text, response_mode, created_at, updated_at, config, version
+)
+VALUES (
+    13, 10, 'ITEM', 'INTERVIEW_QUESTION_3', 'Q3', 3,
+    4, NULL, 'Now I’d like your opinion. Some people believe that reading on a screen is just as valuable as reading printed books or papers. Do you agree with that idea? Why or why not?',
+    'SPOKEN', now(), now(), '{}'::jsonb, 0
+)
+ON CONFLICT (id) DO UPDATE SET
+    parent_node_id=EXCLUDED.parent_node_id,
+    kind=EXCLUDED.kind,
+    code=EXCLUDED.code,
+    title=EXCLUDED.title,
+    display_order=EXCLUDED.display_order,
+    skill_id=EXCLUDED.skill_id,
+    instructions=EXCLUDED.instructions,
+    transcript_text=EXCLUDED.transcript_text,
+    response_mode=EXCLUDED.response_mode,
+    config=EXCLUDED.config,
+    version=EXCLUDED.version,
+    updated_at=now();
+
+-- Question 4
+INSERT INTO material_node (
+    id, parent_node_id, kind, code, title, display_order,
+    skill_id, instructions, transcript_text, response_mode, created_at, updated_at, config, version
+)
+VALUES (
+    14, 10, 'ITEM', 'INTERVIEW_QUESTION_4', 'Q4', 4,
+    4, NULL, 'One last question. Do you think schools and workplaces should encourage people to spend more time reading carefully and less time quickly scrolling through short online content? Why or why not?',
+    'SPOKEN', now(), now(), '{}'::jsonb, 0
+)
+ON CONFLICT (id) DO UPDATE SET
+    parent_node_id=EXCLUDED.parent_node_id,
+    kind=EXCLUDED.kind,
+    code=EXCLUDED.code,
+    title=EXCLUDED.title,
+    display_order=EXCLUDED.display_order,
+    skill_id=EXCLUDED.skill_id,
+    instructions=EXCLUDED.instructions,
+    transcript_text=EXCLUDED.transcript_text,
+    response_mode=EXCLUDED.response_mode,
+    config=EXCLUDED.config,
+    version=EXCLUDED.version,
+    updated_at=now();
+

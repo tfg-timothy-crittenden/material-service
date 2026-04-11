@@ -14,4 +14,5 @@ public interface MaterialNodeRepositoryPort {
     List<MaterialNode> findAllDescendantsByRootId(Long sectionId);
     List<MaterialNode> findByKind(String kind);
     List<MaterialNode> findByKindAndExamFamilyIdAndSkillId(String kind, Long examFamilyId, Long skillId);
+    Optional<MaterialNode> findByParentIdAndDisplayOrder(Long parentId, Integer displayOrder);
 }

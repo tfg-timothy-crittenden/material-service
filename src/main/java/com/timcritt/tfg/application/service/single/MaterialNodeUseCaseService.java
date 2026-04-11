@@ -39,4 +39,12 @@ public class MaterialNodeUseCaseService {
     public List<MaterialNode> findByKindAndExamFamilyIdAndSkillId(String kind, Long examFamilyId, Long skillId) {
         return repository.findByKindAndExamFamilyIdAndSkillId(kind, examFamilyId, skillId);
     }
+
+    public List<MaterialNode> findByParentNodeId(Long parentNodeId) {
+        return repository.findByParentNodeId(parentNodeId);
+    }
+
+    public Optional<MaterialNode> findByParentIdAndDisplayOrder(Long parentId, Integer displayOrder) {
+        return repository.findByParentIdAndDisplayOrder(parentId, displayOrder);
+    }
 }

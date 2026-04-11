@@ -2,6 +2,7 @@ package com.timcritt.tfg.infrastructure.web.dto;
 
 import lombok.*;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -38,5 +39,5 @@ public class MaterialNodeDto {
     private Long version;
     private Instant createdAt;
     private Instant updatedAt;
+    private List<MaterialAssetDto> materialAssets;
 }
-

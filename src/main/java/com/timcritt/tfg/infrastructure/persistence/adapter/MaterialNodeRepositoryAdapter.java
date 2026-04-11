@@ -70,4 +70,10 @@ public class MaterialNodeRepositoryAdapter implements MaterialNodeRepositoryPort
                 .map(MaterialNodeEntityMapper::toDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public Optional<MaterialNode> findByParentIdAndDisplayOrder(Long parentId, Integer displayOrder) {
+        return jpaRepository.findByParentNodeIdAndDisplayOrder(parentId, displayOrder)
+                .map(MaterialNodeEntityMapper::toDomain);
+    }
 }
