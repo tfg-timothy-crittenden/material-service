@@ -9,4 +9,5 @@ public interface MaterialUseCase {
     Material updateMaterial(Material material);
     Boolean deleteMaterial(Long id);
     List<Material> findByExamFamilyId(Long examFamilyId);
+    List<Material> findAll();
 }

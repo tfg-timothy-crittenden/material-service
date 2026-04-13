@@ -40,4 +40,9 @@ public class MaterialServiceAdapter implements MaterialUseCase {
     public List<Material> findByExamFamilyId(Long examFamilyId) {
         return delegate.findByExamFamilyId(examFamilyId);
     }
+
+    @Override
+    public List<Material> findAll() {
+        return delegate.findAll();
+    }
 }

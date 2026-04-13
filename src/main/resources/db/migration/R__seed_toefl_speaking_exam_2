@@ -1,0 +1,128 @@
+-- Seed TOEFL Speaking exam material (Part 1: Listen and Repeat, Part 2: Take an Interview) for a new instance
+-- Assumes material and root node already exist (adjust ids as needed)
+
+-- Upsert material entry for the new TOEFL Speaking Exam 2 (root node id=2)
+INSERT INTO material (
+    id, exam_family_id, code, title, description, material_node_id, version, created_at, updated_at
+) VALUES (
+    2, 1, 'TOEFL_2', 'TOEFL Practice Test 2', 'TOEFL Practice Test 2', 2, 0, now(), now()
+)
+ON CONFLICT (id) DO UPDATE SET
+    code=EXCLUDED.code, title=EXCLUDED.title, description=EXCLUDED.description, material_node_id=EXCLUDED.material_node_id, updated_at=now();
+
+-- Upsert part 1 node (Listen and Repeat) as PART under root (assume root id=2 for this new exam)
+INSERT INTO material_node (
+    id, parent_node_id, blueprint_node_id, kind, code, title, display_order,
+    skill_id, task_type_id, instructions, stimulus_text, transcript_text, explanation_text,
+    time_limit_seconds, prep_time_seconds, response_mode, response_required, min_duration_seconds, max_duration_seconds, min_word_count, max_word_count, scoring_mode, max_score, passing_score, config, version, created_at, updated_at
+) VALUES (
+    20, 2, NULL, 'PART', 'LISTEN_REPEAT', 'Listen and Repeat', 0,
+    4, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, 'SPOKEN', FALSE, NULL, NULL, NULL, NULL, 'NONE', NULL, NULL, '{}', 0, now(), now()
+)
+ON CONFLICT (parent_node_id, display_order) DO UPDATE SET
+    blueprint_node_id=EXCLUDED.blueprint_node_id,
+    kind=EXCLUDED.kind,
+    code=EXCLUDED.code,
+    title=EXCLUDED.title,
+    skill_id=EXCLUDED.skill_id,
+    task_type_id=EXCLUDED.task_type_id,
+    instructions=EXCLUDED.instructions,
+    stimulus_text=EXCLUDED.stimulus_text,
+    transcript_text=EXCLUDED.transcript_text,
+    explanation_text=EXCLUDED.explanation_text,
+    time_limit_seconds=EXCLUDED.time_limit_seconds,
+    prep_time_seconds=EXCLUDED.prep_time_seconds,
+    response_mode=EXCLUDED.response_mode,
+    response_required=EXCLUDED.response_required,
+    min_duration_seconds=EXCLUDED.min_duration_seconds,
+    max_duration_seconds=EXCLUDED.max_duration_seconds,
+    min_word_count=EXCLUDED.min_word_count,
+    max_word_count=EXCLUDED.max_word_count,
+    scoring_mode=EXCLUDED.scoring_mode,
+    max_score=EXCLUDED.max_score,
+    passing_score=EXCLUDED.passing_score,
+    config=COALESCE(EXCLUDED.config, '{}'),
+    version=EXCLUDED.version,
+    updated_at=now();
+
+-- Upsert Listen and Repeat questions (items) under part 1
+INSERT INTO material_node (
+    id, parent_node_id, kind, code, title, display_order,
+    skill_id, instructions, transcript_text, response_mode, created_at, updated_at, config, version
+) VALUES
+    (21, 20, 'ITEM', 'LISTEN_REPEAT_1', 'Q1', 0, 4, NULL, 'Welcome to the campus library entrance.', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (22, 20, 'ITEM', 'LISTEN_REPEAT_2', 'Q2', 1, 4, NULL, 'Students can borrow books at this desk.', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (23, 20, 'ITEM', 'LISTEN_REPEAT_3', 'Q3', 2, 4, NULL, 'Please scan your student card before using the self-checkout machine.', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (24, 20, 'ITEM', 'LISTEN_REPEAT_4', 'Q4', 3, 4, NULL, 'The computers near the window are for research, printing, and homework.', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (25, 20, 'ITEM', 'LISTEN_REPEAT_5', 'Q5', 4, 4, NULL, 'Return library books on time to avoid late fees on your account.', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (26, 20, 'ITEM', 'LISTEN_REPEAT_6', 'Q6', 5, 4, NULL, 'Group study rooms can be reserved online, but please arrive early so your booking is not canceled.', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (27, 20, 'ITEM', 'LISTEN_REPEAT_7', 'Q7', 6, 4, NULL, 'Before you leave the library, put your chair back, collect your items, and make sure your table is clean.', 'SPOKEN', now(), now(), '{}'::jsonb, 0)
+ON CONFLICT (parent_node_id, display_order) DO UPDATE SET
+    kind=EXCLUDED.kind,
+    code=EXCLUDED.code,
+    title=EXCLUDED.title,
+    skill_id=EXCLUDED.skill_id,
+    instructions=EXCLUDED.instructions,
+    transcript_text=EXCLUDED.transcript_text,
+    response_mode=EXCLUDED.response_mode,
+    config=COALESCE(EXCLUDED.config, '{}'),
+    version=EXCLUDED.version,
+    updated_at=now();
+
+-- Upsert part 2 node (Take an Interview) as PART under root (assume root id=2 for this new exam)
+INSERT INTO material_node (
+    id, parent_node_id, blueprint_node_id, kind, code, title, display_order,
+    skill_id, task_type_id, instructions, stimulus_text, transcript_text, explanation_text,
+    time_limit_seconds, prep_time_seconds, response_mode, response_required, min_duration_seconds, max_duration_seconds, min_word_count, max_word_count, scoring_mode, max_score, passing_score, config, version, created_at, updated_at
+) VALUES (
+    30, 2, NULL, 'PART', 'TAKE_INTERVIEW', 'Take an Interview', 1,
+    4, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, 'SPOKEN', FALSE, NULL, NULL, NULL, NULL, 'NONE', NULL, NULL, '{}', 0, now(), now()
+)
+ON CONFLICT (parent_node_id, display_order) DO UPDATE SET
+    blueprint_node_id=EXCLUDED.blueprint_node_id,
+    kind=EXCLUDED.kind,
+    code=EXCLUDED.code,
+    title=EXCLUDED.title,
+    skill_id=EXCLUDED.skill_id,
+    task_type_id=EXCLUDED.task_type_id,
+    instructions=EXCLUDED.instructions,
+    stimulus_text=EXCLUDED.stimulus_text,
+    transcript_text=EXCLUDED.transcript_text,
+    explanation_text=EXCLUDED.explanation_text,
+    time_limit_seconds=EXCLUDED.time_limit_seconds,
+    prep_time_seconds=EXCLUDED.prep_time_seconds,
+    response_mode=EXCLUDED.response_mode,
+    response_required=EXCLUDED.response_required,
+    min_duration_seconds=EXCLUDED.min_duration_seconds,
+    max_duration_seconds=EXCLUDED.max_duration_seconds,
+    min_word_count=EXCLUDED.min_word_count,
+    max_word_count=EXCLUDED.max_word_count,
+    scoring_mode=EXCLUDED.scoring_mode,
+    max_score=EXCLUDED.max_score,
+    passing_score=EXCLUDED.passing_score,
+    config=COALESCE(EXCLUDED.config, '{}'),
+    version=EXCLUDED.version,
+    updated_at=now();
+
+-- Upsert Take an Interview questions (items) under part 2
+INSERT INTO material_node (
+    id, parent_node_id, kind, code, title, display_order,
+    skill_id, instructions, transcript_text, response_mode, created_at, updated_at, config, version
+) VALUES
+    (31, 30, 'ITEM', 'INTERVIEW_QUESTION_1', 'Q1', 0, 4, NULL, 'Thank you for speaking with me today. Please think about the last time you read something that was important to you, such as a book, an article, a message, or some information for school or work. What were you reading, and why was it important to you?', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (32, 30, 'ITEM', 'INTERVIEW_QUESTION_2', 'Q2', 1, 4, NULL, 'People have very different reading habits in daily life. Some people read a little every day, while others only read when they need information. What are your reading habits usually like, and why do you think they developed that way?', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (33, 30, 'ITEM', 'INTERVIEW_QUESTION_3', 'Q3', 2, 4, NULL, 'Now I’d like your opinion. Some people believe that reading on a screen is just as valuable as reading printed books or papers. Do you agree with that idea? Why or why not?', 'SPOKEN', now(), now(), '{}'::jsonb, 0),
+    (34, 30, 'ITEM', 'INTERVIEW_QUESTION_4', 'Q4', 3, 4, NULL, 'One last question. Do you think schools and workplaces should encourage people to spend more time reading carefully and less time quickly scrolling through short online content? Why or why not?', 'SPOKEN', now(), now(), '{}'::jsonb, 0)
+ON CONFLICT (parent_node_id, display_order) DO UPDATE SET
+    kind=EXCLUDED.kind,
+    code=EXCLUDED.code,
+    title=EXCLUDED.title,
+    skill_id=EXCLUDED.skill_id,
+    instructions=EXCLUDED.instructions,
+    transcript_text=EXCLUDED.transcript_text,
+    response_mode=EXCLUDED.response_mode,
+    config=COALESCE(EXCLUDED.config, '{}'),
+    version=EXCLUDED.version,
+    updated_at=now();

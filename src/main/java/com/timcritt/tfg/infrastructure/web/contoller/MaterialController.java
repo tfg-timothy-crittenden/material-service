@@ -42,5 +42,11 @@ public class MaterialController {
         List<MaterialDto> dtos = materials.stream().map(MaterialDtoMapper::toDto).toList();
         return ResponseEntity.ok(dtos);
     }
+    @GetMapping
+    public ResponseEntity<List<MaterialDto>> getAll() {
+        List<com.timcritt.tfg.domain.model.Material> materials = useCase.findAll();
+        List<MaterialDto> dtos = materials.stream().map(MaterialDtoMapper::toDto).toList();
+        return ResponseEntity.ok(dtos);
+    }
 
 }

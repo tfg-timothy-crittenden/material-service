@@ -30,4 +30,8 @@ public class MaterialUseCaseService implements MaterialUseCase {
     public List<Material> findByExamFamilyId(Long examFamilyId) {
         return repository.findByExamFamilyId(examFamilyId);
     }
+    @Override
+    public List<Material> findAll() {
+        return repository.findAll();
+    }
 }
