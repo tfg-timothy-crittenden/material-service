@@ -8,7 +8,12 @@ public final class MaterialAssetDtoMapper {
 
     public static MaterialAssetDto toDto(MaterialAsset asset) {
         if (asset == null) return null;
-        return MaterialAssetDto.fromDomain(asset);
+        return MaterialAssetDto.builder()
+            .id(asset.getId())
+            .kind(asset.getKind() != null ? asset.getKind().name() : null)
+            .storageKey(asset.getStorageKey())
+            .displayOrder(asset.getDisplayOrder())
+            .build();
     }
 
     // Optionally, add fromDto if needed

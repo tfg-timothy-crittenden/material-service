@@ -20,9 +20,9 @@ INSERT INTO material_node (
     skill_id, task_type_id, instructions, stimulus_text, transcript_text,
     response_mode, created_at, updated_at
 ) VALUES
-    (11, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q1', 1, 4, NULL, NULL, NULL, 'Tell me about a time you solved a problem.', 'SPOKEN',  now(), now()),
-    (12, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q2', 2, 4, NULL, NULL, NULL, 'What is your favorite subject and why?','SPOKEN',now(), now()),
-    (13, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q3', 3, 4, NULL, NULL, NULL, 'Describe a challenge you faced at school.','SPOKEN',now(), now()),
-    (14, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q4', 4, 4, NULL, NULL, NULL,  'How do you prepare for exams?', 'SPOKEN',now(), now())
+    (11, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q1', 0, 4, NULL, NULL, NULL, 'Tell me about a time you solved a problem.', 'SPOKEN',  now(), now()),
+    (12, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q2', 1, 4, NULL, NULL, NULL, 'What is your favorite subject and why?','SPOKEN',now(), now()),
+    (13, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q3', 2, 4, NULL, NULL, NULL, 'Describe a challenge you faced at school.','SPOKEN',now(), now()),
+    (14, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q4', 3, 4, NULL, NULL, NULL,  'How do you prepare for exams?', 'SPOKEN',now(), now())
 ON CONFLICT (id) DO UPDATE SET
     title=EXCLUDED.title, parent_node_id=EXCLUDED.parent_node_id, kind=EXCLUDED.kind, display_order=EXCLUDED.display_order, skill_id=EXCLUDED.skill_id, transcript_text=EXCLUDED.transcript_text, updated_at=now();
