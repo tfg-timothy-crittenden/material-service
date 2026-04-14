@@ -6,3 +6,5 @@ VALUES
     (3, 'SPEAKING', 'Speaking', 'Oral production and interaction', 0, now(), now()),
     (4, 'WRITING', 'Writing', 'Written production and interaction', 0, now(), now())
 ON CONFLICT (code) DO NOTHING;
+
+

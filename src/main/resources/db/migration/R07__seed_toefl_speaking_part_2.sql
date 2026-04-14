@@ -26,3 +26,5 @@ INSERT INTO material_node (
     (14, 10, 'ITEM', 'INTERVIEW_QUESTION', 'Q4', 3, 4, NULL, NULL, NULL,  'How do you prepare for exams?', 'SPOKEN',now(), now())
 ON CONFLICT (id) DO UPDATE SET
     title=EXCLUDED.title, parent_node_id=EXCLUDED.parent_node_id, kind=EXCLUDED.kind, display_order=EXCLUDED.display_order, skill_id=EXCLUDED.skill_id, transcript_text=EXCLUDED.transcript_text, updated_at=now();
+
+

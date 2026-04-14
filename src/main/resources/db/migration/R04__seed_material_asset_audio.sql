@@ -35,18 +35,4 @@ SELECT nextval('material_asset_id_seq'), 12, 'AUDIO', 'speaking/take-interview/q
     SELECT 1 FROM material_asset WHERE material_node_id = 12 AND kind = 'AUDIO'
 );
 
-INSERT INTO material_asset (
-    id, material_node_id, kind, storage_key, created_at, updated_at, display_order, metadata, version
-)
-SELECT nextval('material_asset_id_seq'), 13, 'AUDIO', 'speaking/take-interview/question-audio/question-2.mp3', now(), now(), 2, '{}'::jsonb, 0
-    WHERE NOT EXISTS (
-    SELECT 1 FROM material_asset WHERE material_node_id = 13 AND kind = 'AUDIO'
-);
 
-INSERT INTO material_asset (
-    id, material_node_id, kind, storage_key, created_at, updated_at, display_order, metadata, version
-)
-SELECT nextval('material_asset_id_seq'), 14, 'AUDIO', 'speaking/take-interview/question-audio/question-3.mp3', now(), now(), 3, '{}'::jsonb, 0
-    WHERE NOT EXISTS (
-    SELECT 1 FROM material_asset WHERE material_node_id = 14 AND kind = 'AUDIO'
-);
