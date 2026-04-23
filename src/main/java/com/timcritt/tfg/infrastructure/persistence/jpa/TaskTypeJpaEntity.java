@@ -29,7 +29,7 @@ public class TaskTypeJpaEntity {
     @Column
     private String description;
 
-    @Column(name = "config_schema", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "config_schema", columnDefinition = "json", nullable = false)
     private String configSchema;
 
     @Version
@@ -41,4 +41,3 @@ public class TaskTypeJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 }
-

@@ -10,7 +10,6 @@ public final class ExamFamilyDtoMapper {
         if (d == null) return null;
         ExamFamilyDto dto = new ExamFamilyDto();
         dto.setId(d.getId());
-        dto.setCode(d.getCode());
         dto.setName(d.getName());
         dto.setDescription(d.getDescription());
         dto.setVersion(d.getVersion());
@@ -23,7 +22,6 @@ public final class ExamFamilyDtoMapper {
         if (dto == null) return null;
         ExamFamily domain = new ExamFamily();
         domain.setId(dto.getId());
-        domain.setCode(dto.getCode());
         domain.setName(dto.getName());
         domain.setDescription(dto.getDescription());
         domain.setVersion(dto.getVersion());

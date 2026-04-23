@@ -9,8 +9,6 @@ import java.time.Instant;
 public class MaterialDto {
     private Long id;
     private Long examFamilyId;
-    private Long blueprintId;
-    private String code;
     private String title;
     private String description;
     private Long authorId;

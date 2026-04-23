@@ -1,9 +1,7 @@
 CREATE TABLE IF NOT EXISTS material_node (
     id                      BIGINT PRIMARY KEY,
     parent_node_id          BIGINT         REFERENCES material_node(id) ON DELETE CASCADE,
-    blueprint_node_id       BIGINT         REFERENCES exam_blueprint_node(id) ON DELETE SET NULL,
     kind                    VARCHAR(30)  NOT NULL,
-    code                    VARCHAR(100) NOT NULL,
     title                   VARCHAR(250),
     display_order           INTEGER      NOT NULL CHECK (display_order >= 0),
     skill_id                BIGINT         REFERENCES skill(id) ON DELETE SET NULL,
@@ -23,7 +21,7 @@ CREATE TABLE IF NOT EXISTS material_node (
     scoring_mode            VARCHAR(30)  NOT NULL DEFAULT 'NONE',
     max_score               NUMERIC(8,2),
     passing_score           NUMERIC(8,2),
-    config                  JSONB        NOT NULL DEFAULT '{}',
+    config                  JSONB        NOT NULL DEFAULT '{}'::jsonb,
     version                 BIGINT       NOT NULL DEFAULT 0,
     created_at              TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ  NOT NULL DEFAULT now(),
@@ -64,4 +62,3 @@ CREATE TABLE IF NOT EXISTS material_node (
     CONSTRAINT uq_material_node_sibling_order
         UNIQUE (parent_node_id, display_order)
 );
-

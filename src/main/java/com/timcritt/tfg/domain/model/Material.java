@@ -12,9 +12,7 @@ import java.time.Instant;
 public class Material {
     private Long id;
     private Long examFamilyId;
-    private Long blueprintId;
     private Long materialNodeId; // Link to root node
-    private String code;
     private String title;
     private String description;
     private Long authorId;

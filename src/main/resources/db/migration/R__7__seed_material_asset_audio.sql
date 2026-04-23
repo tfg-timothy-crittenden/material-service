@@ -1,3 +1,4 @@
+-- Sync sequence to max(id) in material_asset
 INSERT INTO material_asset (
     id, material_node_id, kind, storage_key, created_at, updated_at, display_order, metadata, version, title, transcript_text
 )
@@ -27,12 +28,5 @@ SELECT nextval('material_asset_id_seq'), 11, 'AUDIO', 'speaking/take-interview/q
     SELECT 1 FROM material_asset WHERE material_node_id = 11 AND kind = 'AUDIO'
 );
 
-INSERT INTO material_asset (
-    id, material_node_id, kind, storage_key, created_at, updated_at, display_order, metadata, version
-)
-SELECT nextval('material_asset_id_seq'), 12, 'AUDIO', 'speaking/take-interview/question-audio/question-1.mp3', now(), now(), 1, '{}'::jsonb, 0
-    WHERE NOT EXISTS (
-    SELECT 1 FROM material_asset WHERE material_node_id = 12 AND kind = 'AUDIO'
-);
-
-
+-- Ensure sequence is set to max(id)
+SELECT setval('material_asset_id_seq', (SELECT COALESCE(MAX(id), 1) FROM material_asset));

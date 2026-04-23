@@ -11,16 +11,15 @@ import java.time.Instant;
 @AllArgsConstructor
 public class MaterialJpaEntity {
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "material_id_seq")
+    @SequenceGenerator(name = "material_id_seq", sequenceName = "material_id_seq", allocationSize = 1)
     private Long id;
 
     @Column(name = "exam_family_id", nullable = false)
     private Long examFamilyId;
 
-    @Column(name = "blueprint_id")
-    private Long blueprintId;
-
-    @Column(name = "code", nullable = false, unique = true, length = 100)
-    private String code;
+    @Column(name = "material_node_id")
+    private Long materialNodeId;
 
     @Column(name = "title", nullable = false, length = 250)
     private String title;
@@ -42,7 +41,4 @@ public class MaterialJpaEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    @Column(name = "material_node_id")
-    private Long materialNodeId;
 }

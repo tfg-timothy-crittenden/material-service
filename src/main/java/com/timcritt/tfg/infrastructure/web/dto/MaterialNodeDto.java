@@ -12,7 +12,6 @@ public class MaterialNodeDto {
     private Long id;
     private Long parentNodeId;
     private String kind;
-    private String code;
     private String title;
     private Integer displayOrder;
     private String transcriptText;

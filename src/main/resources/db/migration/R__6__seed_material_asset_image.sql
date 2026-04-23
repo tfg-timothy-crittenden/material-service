@@ -12,4 +12,5 @@ DO UPDATE SET
     metadata = EXCLUDED.metadata,
     version = EXCLUDED.version;
 
-
+-- Ensure sequence is set to max(id)
+SELECT setval('material_asset_id_seq', (SELECT COALESCE(MAX(id), 1) FROM material_asset));

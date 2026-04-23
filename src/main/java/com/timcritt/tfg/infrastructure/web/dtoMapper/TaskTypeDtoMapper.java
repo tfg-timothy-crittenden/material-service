@@ -8,11 +8,10 @@ public class TaskTypeDtoMapper {
         if (taskType == null) return null;
         return TaskTypeDto.builder()
                 .id(taskType.getId())
-                .code(taskType.getCode())
                 .name(taskType.getName())
+                .description(taskType.getDescription())
                 .examFamilyId(taskType.getExamFamilyId())
                 .skillId(taskType.getSkillId())
-                .description(taskType.getDescription())
                 .configSchema(taskType.getConfigSchema())
                 .version(taskType.getVersion())
                 .createdAt(taskType.getCreatedAt())
@@ -24,11 +23,10 @@ public class TaskTypeDtoMapper {
         if (dto == null) return null;
         TaskType taskType = new TaskType();
         taskType.setId(dto.getId());
-        taskType.setCode(dto.getCode());
         taskType.setName(dto.getName());
+        taskType.setDescription(dto.getDescription());
         taskType.setExamFamilyId(dto.getExamFamilyId());
         taskType.setSkillId(dto.getSkillId());
-        taskType.setDescription(dto.getDescription());
         taskType.setConfigSchema(dto.getConfigSchema());
         taskType.setVersion(dto.getVersion());
         taskType.setCreatedAt(dto.getCreatedAt());
@@ -36,4 +34,3 @@ public class TaskTypeDtoMapper {
         return taskType;
     }
 }
-

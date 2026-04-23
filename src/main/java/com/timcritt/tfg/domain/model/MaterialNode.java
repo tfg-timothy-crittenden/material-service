@@ -14,9 +14,7 @@ public class MaterialNode {
     private Long id;
     private Long materialVersionId;
     private Long parentNodeId;
-    private Long blueprintNodeId;
     private String kind;
-    private String code;
     private String title;
     private Integer displayOrder;
     private Long skillId;
@@ -41,4 +39,3 @@ public class MaterialNode {
     private Instant createdAt;
     private Instant updatedAt;
 }
-

@@ -14,20 +14,15 @@ import java.util.Map;
 @AllArgsConstructor
 public class MaterialNodeJpaEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "material_node_id_seq")
+    @SequenceGenerator(name = "material_node_id_seq", sequenceName = "material_node_id_seq", allocationSize = 1)
     private Long id;
 
     @Column(name = "parent_node_id")
     private Long parentNodeId;
 
-    @Column(name = "blueprint_node_id")
-    private Long blueprintNodeId;
-
     @Column(name = "kind", nullable = false)
     private String kind;
-
-    @Column(name = "code", nullable = false)
-    private String code;
 
     @Column(name = "title")
     private String title;
@@ -87,7 +82,7 @@ public class MaterialNodeJpaEntity {
     private Double passingScore;
 
     @Convert(converter = MapToJsonConverter.class)
-    @Column(name = "config", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "config", columnDefinition = "json", nullable = false)
     private Map<String, Object> config;
 
     @Column(name = "version", nullable = false)

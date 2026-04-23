@@ -8,7 +8,6 @@ public class SkillEntityMapper {
         if (entity == null) return null;
         Skill skill = new Skill();
         skill.setId(entity.getId());
-        skill.setCode(entity.getCode());
         skill.setName(entity.getName());
         skill.setDescription(entity.getDescription());
         skill.setVersion(entity.getVersion());
@@ -21,7 +20,6 @@ public class SkillEntityMapper {
         if (domain == null) return null;
         return SkillJpaEntity.builder()
                 .id(domain.getId())
-                .code(domain.getCode())
                 .name(domain.getName())
                 .description(domain.getDescription())
                 .version(domain.getVersion())

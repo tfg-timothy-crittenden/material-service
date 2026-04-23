@@ -4,7 +4,6 @@ import java.util.List;
 
 public class MaterialNodeTreeDto {
     private Long id;
-    private String code;
     private String title;
     private String kind;
     private Integer displayOrder;
@@ -12,9 +11,8 @@ public class MaterialNodeTreeDto {
 
     public MaterialNodeTreeDto() {}
 
-    public MaterialNodeTreeDto(Long id, String code, String title, String kind, Integer displayOrder, List<MaterialNodeTreeDto> children) {
+    public MaterialNodeTreeDto(Long id, String title, String kind, Integer displayOrder, List<MaterialNodeTreeDto> children) {
         this.id = id;
-        this.code = code;
         this.title = title;
         this.kind = kind;
         this.displayOrder = displayOrder;
@@ -27,14 +25,6 @@ public class MaterialNodeTreeDto {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public void setCode(String code) {
-        this.code = code;
     }
 
     public String getTitle() {
@@ -73,7 +63,6 @@ public class MaterialNodeTreeDto {
         if (node == null) return null;
         return new MaterialNodeTreeDto(
             node.getId(),
-            node.getCode(),
             node.getTitle(),
             node.getKind(),
             node.getDisplayOrder(),

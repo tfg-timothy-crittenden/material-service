@@ -1,9 +1,8 @@
 CREATE TABLE IF NOT EXISTS task_type (
     id              BIGINT PRIMARY KEY,
-    code            VARCHAR(100) NOT NULL UNIQUE,
-    name            VARCHAR(200) NOT NULL,
-    exam_family_id  BIGINT REFERENCES exam_family(id) ON DELETE SET NULL,
-    skill_id        BIGINT REFERENCES skill(id) ON DELETE SET NULL,
+    name            VARCHAR(150) NOT NULL,
+    exam_family_id  BIGINT       REFERENCES exam_family(id) ON DELETE RESTRICT,
+    skill_id        BIGINT       REFERENCES skill(id) ON DELETE SET NULL,
     description     TEXT,
     config_schema   JSONB        NOT NULL DEFAULT '{}'::jsonb,
 

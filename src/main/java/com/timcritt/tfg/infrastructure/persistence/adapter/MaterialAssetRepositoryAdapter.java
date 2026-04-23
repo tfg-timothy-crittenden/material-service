@@ -2,9 +2,10 @@ package com.timcritt.tfg.infrastructure.persistence.adapter;
 
 import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialAsset;
-import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeEntity;
+import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeJpaEntity;
 import com.timcritt.tfg.infrastructure.persistence.mapper.MaterialAssetEntityMapper;
 import com.timcritt.tfg.infrastructure.persistence.spring.MaterialAssetJpaRepository;
+import com.timcritt.tfg.infrastructure.persistence.spring.MaterialNodeJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class MaterialAssetRepositoryAdapter implements MaterialAssetRepositoryPort {
     private final MaterialAssetJpaRepository repository;
+    private final MaterialNodeJpaRepository nodeRepository;
 
     @Override
     public Optional<MaterialAsset> findById(Long id) {
@@ -25,10 +27,9 @@ public class MaterialAssetRepositoryAdapter implements MaterialAssetRepositoryPo
 
     @Override
     public MaterialAsset save(MaterialAsset asset) {
-        // This method assumes you have a way to get the MaterialNodeEntity for the asset
-        // For now, this is a placeholder; adapt as needed for your actual logic
-        MaterialNodeEntity nodeEntity = new MaterialNodeEntity();
-        nodeEntity.setId(asset.getMaterialNodeId());
+        // Fetch managed MaterialNodeJpaEntity
+        MaterialNodeJpaEntity nodeEntity = nodeRepository.findById(asset.getMaterialNodeId())
+            .orElseThrow(() -> new IllegalArgumentException("MaterialNode not found for id: " + asset.getMaterialNodeId()));
         return MaterialAssetEntityMapper.toDomain(repository.save(MaterialAssetEntityMapper.toEntity(asset, nodeEntity)));
     }
 

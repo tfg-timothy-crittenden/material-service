@@ -76,4 +76,12 @@ public class MaterialNodeRepositoryAdapter implements MaterialNodeRepositoryPort
         return jpaRepository.findByParentNodeIdAndDisplayOrder(parentId, displayOrder)
                 .map(MaterialNodeEntityMapper::toDomain);
     }
+
+    @Override
+    public List<MaterialNode> findByParentId(Long parentId) {
+        return jpaRepository.findByParentNodeId(parentId)
+                .stream()
+                .map(MaterialNodeEntityMapper::toDomain)
+                .toList();
+    }
 }

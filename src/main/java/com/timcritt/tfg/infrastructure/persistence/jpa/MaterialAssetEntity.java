@@ -18,11 +18,13 @@ import lombok.Builder;
 public class MaterialAssetEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "material_asset_id_seq")
+    @SequenceGenerator(name = "material_asset_id_seq", sequenceName = "material_asset_id_seq", allocationSize = 1)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "material_node_id", nullable = false)
-    private MaterialNodeEntity materialNode;
+    private MaterialNodeJpaEntity materialNode;
 
     @Column(nullable = false, length = 30)
     @Enumerated(EnumType.STRING)
@@ -49,7 +51,7 @@ public class MaterialAssetEntity {
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
 
-    @Column(columnDefinition = "jsonb", nullable = false)
+    @Column(columnDefinition = "json", nullable = false)
     @Convert(converter = JsonbConverter.class)
     private Map<String, Object> metadata;
 

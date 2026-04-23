@@ -9,9 +9,6 @@ public final class MaterialDtoMapper {
         return MaterialDto.builder()
                 .id(d.getId())
                 .examFamilyId(d.getExamFamilyId())
-                .blueprintId(d.getBlueprintId())
-                .materialNodeId(d.getMaterialNodeId())
-                .code(d.getCode())
                 .title(d.getTitle())
                 .description(d.getDescription())
                 .authorId(d.getAuthorId())
@@ -19,6 +16,7 @@ public final class MaterialDtoMapper {
                 .version(d.getVersion())
                 .createdAt(d.getCreatedAt())
                 .updatedAt(d.getUpdatedAt())
+                .materialNodeId(d.getMaterialNodeId())
                 .build();
     }
     public static Material toDomain(MaterialDto dto) {
@@ -26,9 +24,6 @@ public final class MaterialDtoMapper {
         return Material.builder()
                 .id(dto.getId())
                 .examFamilyId(dto.getExamFamilyId())
-                .blueprintId(dto.getBlueprintId())
-                .materialNodeId(dto.getMaterialNodeId())
-                .code(dto.getCode())
                 .title(dto.getTitle())
                 .description(dto.getDescription())
                 .authorId(dto.getAuthorId())
@@ -36,6 +31,7 @@ public final class MaterialDtoMapper {
                 .version(dto.getVersion())
                 .createdAt(dto.getCreatedAt())
                 .updatedAt(dto.getUpdatedAt())
+                .materialNodeId(dto.getMaterialNodeId())
                 .build();
     }
 }

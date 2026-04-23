@@ -8,9 +8,7 @@ public class MaterialEntityMapper {
         return Material.builder()
                 .id(entity.getId())
                 .examFamilyId(entity.getExamFamilyId())
-                .blueprintId(entity.getBlueprintId())
                 .materialNodeId(entity.getMaterialNodeId())
-                .code(entity.getCode())
                 .title(entity.getTitle())
                 .description(entity.getDescription())
                 .authorId(entity.getAuthorId())
@@ -20,14 +18,13 @@ public class MaterialEntityMapper {
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }
+
     public static MaterialJpaEntity toEntity(Material domain) {
         if (domain == null) return null;
         return MaterialJpaEntity.builder()
                 .id(domain.getId())
                 .examFamilyId(domain.getExamFamilyId())
-                .blueprintId(domain.getBlueprintId())
                 .materialNodeId(domain.getMaterialNodeId())
-                .code(domain.getCode())
                 .title(domain.getTitle())
                 .description(domain.getDescription())
                 .authorId(domain.getAuthorId())

@@ -12,14 +12,12 @@ import java.time.Instant;
 @Builder
 public class TaskTypeDto {
     private Long id;
-    private String code;
     private String name;
+    private String description;
     private Long examFamilyId;
     private Long skillId;
-    private String description;
     private String configSchema;
     private Long version;
     private Instant createdAt;
     private Instant updatedAt;
 }
-

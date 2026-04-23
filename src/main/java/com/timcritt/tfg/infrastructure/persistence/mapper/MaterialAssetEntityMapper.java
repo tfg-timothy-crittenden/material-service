@@ -2,7 +2,7 @@ package com.timcritt.tfg.infrastructure.persistence.mapper;
 
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialAssetEntity;
-import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeEntity;
+import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeJpaEntity;
 
 public class MaterialAssetEntityMapper {
     public static MaterialAsset toDomain(MaterialAssetEntity entity) {
@@ -25,7 +25,7 @@ public class MaterialAssetEntityMapper {
         return asset;
     }
 
-    public static MaterialAssetEntity toEntity(MaterialAsset domain, MaterialNodeEntity nodeEntity) {
+    public static MaterialAssetEntity toEntity(MaterialAsset domain, MaterialNodeJpaEntity nodeEntity) {
         if (domain == null) return null;
         MaterialAssetEntity entity = new MaterialAssetEntity();
         entity.setId(domain.getId());
@@ -45,4 +45,3 @@ public class MaterialAssetEntityMapper {
         return entity;
     }
 }
-

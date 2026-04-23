@@ -4,17 +4,16 @@
 
 -- Sentence 1: Easy
 INSERT INTO material_node (
-    id, parent_node_id, kind, code, title, display_order,
+    id, parent_node_id, kind, title, display_order,
     skill_id, instructions, transcript_text, response_mode, created_at, updated_at, config, version
 )
 VALUES (
-    3, 2, 'ITEM', 'LISTEN_REPEAT_1', 'Q1', 0,
+    3, 2, 'ITEM', 'Q1', 0,
     4, NULL, 'Welcome to the campus library entrance.', 'SPOKEN', now(), now(), '{}'::jsonb, 0
 )
 ON CONFLICT (id) DO UPDATE SET
     parent_node_id=EXCLUDED.parent_node_id,
     kind=EXCLUDED.kind,
-    code=EXCLUDED.code,
     title=EXCLUDED.title,
     display_order=EXCLUDED.display_order,
     skill_id=EXCLUDED.skill_id,
@@ -27,15 +26,22 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- Sentence 2: Easy
 INSERT INTO material_node (
-    id, parent_node_id, kind, code, title, display_order,
+    id, parent_node_id, kind, title, display_order,
     skill_id, instructions, transcript_text, response_mode, created_at, updated_at, config, version
 )
 VALUES (
-    4, 2, 'ITEM', 'LISTEN_REPEAT_2', 'Q2', 1,
+    4, 2, 'ITEM', 'Q2', 1,
     4, NULL, 'Students can borrow books at this desk.', 'SPOKEN', now(), now(), '{}'::jsonb, 0
 )
 ON CONFLICT (id) DO UPDATE SET
     parent_node_id=EXCLUDED.parent_node_id,
     kind=EXCLUDED.kind,
-    code=EXCLUDED.code,
-
+    title=EXCLUDED.title,
+    display_order=EXCLUDED.display_order,
+    skill_id=EXCLUDED.skill_id,
+    instructions=EXCLUDED.instructions,
+    transcript_text=EXCLUDED.transcript_text,
+    response_mode=EXCLUDED.response_mode,
+    updated_at=now(),
+    config=EXCLUDED.config,
+    version=EXCLUDED.version;

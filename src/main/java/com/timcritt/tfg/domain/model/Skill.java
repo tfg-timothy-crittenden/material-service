@@ -5,7 +5,6 @@ import java.time.Instant;
 
 public class Skill {
     private Long id;
-    private String code;
     private String name;
     private String description;
     private Long version;
@@ -16,22 +15,18 @@ public class Skill {
     public Skill() {
     }
 
-    public Skill(Long id, String code, String name, String description, Long version, Instant createdAt, Instant updatedAt) {
+    public Skill(Long id, String name, String description, Long version, Instant createdAt, Instant updatedAt) {
         this.id = id;
-        this.code = code;
         this.name = name;
         this.description = description;
         this.version = version;
         this.createdAt = createdAt;
-        this.updatedAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

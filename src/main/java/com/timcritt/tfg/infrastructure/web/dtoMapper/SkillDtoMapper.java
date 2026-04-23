@@ -8,7 +8,6 @@ public class SkillDtoMapper {
         if (skill == null) return null;
         return SkillDto.builder()
                 .id(skill.getId())
-                .code(skill.getCode())
                 .name(skill.getName())
                 .description(skill.getDescription())
                 .version(skill.getVersion())
@@ -21,7 +20,6 @@ public class SkillDtoMapper {
         if (dto == null) return null;
         Skill skill = new Skill();
         skill.setId(dto.getId());
-        skill.setCode(dto.getCode());
         skill.setName(dto.getName());
         skill.setDescription(dto.getDescription());
         skill.setVersion(dto.getVersion());
@@ -30,4 +28,3 @@ public class SkillDtoMapper {
         return skill;
     }
 }
-

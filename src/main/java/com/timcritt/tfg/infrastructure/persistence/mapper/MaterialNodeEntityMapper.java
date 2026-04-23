@@ -8,11 +8,9 @@ public class MaterialNodeEntityMapper {
         if (entity == null) return null;
         return MaterialNode.builder()
                 .id(entity.getId())
-
+                .materialVersionId(null)
                 .parentNodeId(entity.getParentNodeId())
-                .blueprintNodeId(entity.getBlueprintNodeId())
                 .kind(entity.getKind())
-                .code(entity.getCode())
                 .title(entity.getTitle())
                 .displayOrder(entity.getDisplayOrder())
                 .skillId(entity.getSkillId())
@@ -43,11 +41,8 @@ public class MaterialNodeEntityMapper {
         if (domain == null) return null;
         return MaterialNodeJpaEntity.builder()
                 .id(domain.getId())
-
                 .parentNodeId(domain.getParentNodeId())
-                .blueprintNodeId(domain.getBlueprintNodeId())
                 .kind(domain.getKind())
-                .code(domain.getCode())
                 .title(domain.getTitle())
                 .displayOrder(domain.getDisplayOrder())
                 .skillId(domain.getSkillId())
@@ -74,4 +69,3 @@ public class MaterialNodeEntityMapper {
                 .build();
     }
 }
-

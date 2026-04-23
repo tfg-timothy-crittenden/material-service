@@ -2,6 +2,7 @@ package com.timcritt.tfg.infrastructure.web.dto;
 
 import lombok.*;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -11,9 +12,9 @@ public class MaterialNodeWithAssetsDto {
     private Long id;
     private Long parentNodeId;
     private String kind;
-    private String code;
     private String title;
     private Integer displayOrder;
     private String transcriptText;
     private List<MaterialAssetDto> assets;
+    private Map<String, Object> config;
 }
