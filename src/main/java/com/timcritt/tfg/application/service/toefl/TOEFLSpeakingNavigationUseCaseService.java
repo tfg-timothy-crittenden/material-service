@@ -1,5 +1,10 @@
 package com.timcritt.tfg.application.service.toefl;
 
+import com.timcritt.tfg.application.dto.MaterialNodeWithAssetsResult;
+import com.timcritt.tfg.application.dto.SpeakingQuestionEditResult;
+import com.timcritt.tfg.application.dto.SpeakingSectionEditResult;
+import com.timcritt.tfg.application.dto.SpeakingSectionSummary;
+import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
@@ -7,14 +12,12 @@ import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialNode;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 
-import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
-@Service
-public class TOEFLSpeakingNavigationUseCaseService {
+public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavigationUseCase {
     private final MaterialRepositoryPort materialRepository;
     private final MaterialNodeRepositoryPort materialNodeRepository;
     private final MaterialAssetRepositoryPort materialAssetRepository;
@@ -28,7 +31,8 @@ public class TOEFLSpeakingNavigationUseCaseService {
         this.materialAssetRepository = materialAssetRepository;
     }
 
-    public Optional<MaterialNodeWithAssets> getQuestion(Long materialId, int partOrder, int questionOrder) {
+    @Override
+    public Optional<MaterialNodeWithAssetsResult> getQuestion(Long materialId, int partOrder, int questionOrder) {
         // Convert 1-based index from frontend to 0-based for backend
         int zeroBasedPartOrder = partOrder - 1;
         int zeroBasedQuestionOrder = questionOrder - 1;
@@ -42,11 +46,42 @@ public class TOEFLSpeakingNavigationUseCaseService {
         if (questionNodeOpt.isEmpty()) return Optional.empty();
         MaterialNode questionNode = questionNodeOpt.get();
         List<MaterialAsset> assets = materialAssetRepository.findByMaterialNodeId(questionNode.getId());
-        return Optional.of(new MaterialNodeWithAssets(questionNode, assets));
+        return Optional.of(new MaterialNodeWithAssetsResult(questionNode, assets));
     }
 
-    public List<com.timcritt.tfg.infrastructure.web.dto.SpeakingSectionSummaryDto> getAllSpeakingSectionSummaries() {
-        List<com.timcritt.tfg.infrastructure.web.dto.SpeakingSectionSummaryDto> result = new ArrayList<>();
+    @Override
+    public Optional<SpeakingSectionEditResult> getSpeakingSectionForEdit(Long materialId) {
+        Optional<Material> materialOpt = materialRepository.findById(materialId);
+        if (materialOpt.isEmpty() || materialOpt.get().getMaterialNodeId() == null) {
+            return Optional.empty();
+        }
+
+        Material material = materialOpt.get();
+        Optional<MaterialNode> rootOpt = materialNodeRepository.findById(material.getMaterialNodeId());
+        if (rootOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        MaterialNode rootNode = rootOpt.get();
+        Optional<MaterialNode> part1Opt = materialNodeRepository.findByParentIdAndDisplayOrder(rootNode.getId(), 0);
+        Optional<MaterialNode> part2Opt = materialNodeRepository.findByParentIdAndDisplayOrder(rootNode.getId(), 1);
+
+        return Optional.of(SpeakingSectionEditResult.builder()
+                .materialId(material.getId())
+                .sectionId(rootNode.getId())
+                .materialTitle(material.getTitle())
+                .materialDescription(material.getDescription())
+                .partTitle(part1Opt.map(MaterialNode::getTitle).orElse(null))
+                .partImageStorageKey(part1Opt.map(this::findImageStorageKey).orElse(null))
+                .questions(part1Opt.map(this::toQuestionEditList).orElse(List.of()))
+                .part2Title(part2Opt.map(MaterialNode::getTitle).orElse(null))
+                .part2Questions(part2Opt.map(this::toQuestionEditList).orElse(List.of()))
+                .build());
+    }
+
+    @Override
+    public List<SpeakingSectionSummary> getAllSpeakingSectionSummaries() {
+        List<SpeakingSectionSummary> result = new ArrayList<>();
         // Find all SECTION nodes (root nodes for speaking sections)
         List<MaterialNode> sections = materialNodeRepository.findByKind("SECTION");
         for (MaterialNode section : sections) {
@@ -65,7 +100,7 @@ public class TOEFLSpeakingNavigationUseCaseService {
                     part2Title = part.getTitle();
                 }
             }
-            result.add(com.timcritt.tfg.infrastructure.web.dto.SpeakingSectionSummaryDto.builder()
+            result.add(SpeakingSectionSummary.builder()
                     .sectionId(section.getId())
                     .sectionTitle(section.getTitle())
                     .part1Id(part1Id)
@@ -77,12 +112,39 @@ public class TOEFLSpeakingNavigationUseCaseService {
         return result;
     }
 
-    public static class MaterialNodeWithAssets {
-        public final MaterialNode node;
-        public final List<MaterialAsset> assets;
-        public MaterialNodeWithAssets(MaterialNode node, List<MaterialAsset> assets) {
-            this.node = node;
-            this.assets = assets;
-        }
+    private String findImageStorageKey(MaterialNode partNode) {
+        return materialAssetRepository.findByMaterialNodeId(partNode.getId()).stream()
+                .filter(a -> a.getKind() == MaterialAsset.Kind.IMAGE)
+                .sorted(Comparator.comparing(MaterialAsset::getDisplayOrder,
+                        Comparator.nullsLast(Integer::compareTo)))
+                .map(MaterialAsset::getStorageKey)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private List<SpeakingQuestionEditResult> toQuestionEditList(MaterialNode partNode) {
+        return materialNodeRepository.findByParentNodeId(partNode.getId()).stream()
+                // Question nodes are currently persisted as ITEM; keep QUESTION for backward compatibility.
+                .filter(node -> "ITEM".equalsIgnoreCase(node.getKind()) || "QUESTION".equalsIgnoreCase(node.getKind()))
+                .sorted(Comparator.comparing(MaterialNode::getDisplayOrder,
+                        Comparator.nullsLast(Integer::compareTo)))
+                .map(node -> SpeakingQuestionEditResult.builder()
+                        .index(node.getDisplayOrder())
+                        .questionNodeId(node.getId())
+                        .transcriptText(node.getTranscriptText())
+                        .config(node.getConfig())
+                        .audioStorageKey(findAudioStorageKey(node.getId()))
+                        .build())
+                .toList();
+    }
+
+    private String findAudioStorageKey(Long questionNodeId) {
+        return materialAssetRepository.findByMaterialNodeId(questionNodeId).stream()
+                .filter(a -> a.getKind() == MaterialAsset.Kind.AUDIO)
+                .sorted(Comparator.comparing(MaterialAsset::getDisplayOrder,
+                        Comparator.nullsLast(Integer::compareTo)))
+                .map(MaterialAsset::getStorageKey)
+                .findFirst()
+                .orElse(null);
     }
 }

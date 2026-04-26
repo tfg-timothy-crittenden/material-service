@@ -4,14 +4,12 @@ import com.timcritt.tfg.application.dto.MaterialNodeTreeDto;
 import com.timcritt.tfg.application.port.inbound.MaterialAggregationUseCase;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialNode;
-import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Service
 public class MaterialAggregationService implements MaterialAggregationUseCase {
     private final MaterialNodeRepositoryPort materialNodeRepository;
 
