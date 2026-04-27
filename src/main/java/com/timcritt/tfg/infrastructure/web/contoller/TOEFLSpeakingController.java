@@ -12,6 +12,8 @@ import com.timcritt.tfg.infrastructure.web.dtoMapper.MaterialNodeWithAssetsDtoMa
 import com.timcritt.tfg.infrastructure.web.dtoMapper.SpeakingSectionEditDtoMapper;
 import com.timcritt.tfg.infrastructure.web.dtoMapper.SpeakingSectionSummaryDtoMapper;
 import com.timcritt.tfg.infrastructure.web.dtoMapper.TOEFLSpeakingUploadCommandMapper;
+import com.timcritt.tfg.infrastructure.security.authorization.MaterialId;
+import com.timcritt.tfg.infrastructure.security.authorization.RequireMaterialReadAccess;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -44,9 +46,10 @@ public class TOEFLSpeakingController {
         this.commandUseCase = commandUseCase;
     }
 
+    @RequireMaterialReadAccess
     @GetMapping("/material/{materialId}/part/{partNumber}/question/{questionNumber}")
     public ResponseEntity<MaterialNodeWithAssetsDto> getQuestion(
-            @PathVariable Long materialId,
+            @MaterialId @PathVariable Long materialId,
             @PathVariable int partNumber,
             @PathVariable int questionNumber) {
         return navigationUseCase.getQuestion(materialId, partNumber, questionNumber)
@@ -91,8 +94,9 @@ public class TOEFLSpeakingController {
         return ResponseEntity.ok().build();
     }
 
+
     @GetMapping("/material/{materialId}/section")
-    public ResponseEntity<SpeakingSectionEditDto> getSpeakingSectionForEdit(@PathVariable Long materialId) {
+    public ResponseEntity<SpeakingSectionEditDto> getSpeakingSectionForEdit(@MaterialId @PathVariable Long materialId) {
         return navigationUseCase.getSpeakingSectionForEdit(materialId)
                 .map(SpeakingSectionEditDtoMapper::toDto)
                 .map(ResponseEntity::ok)
