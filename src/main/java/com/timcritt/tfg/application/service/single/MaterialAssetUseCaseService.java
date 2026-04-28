@@ -1,31 +1,31 @@
 package com.timcritt.tfg.application.service.single;
 
 import com.timcritt.tfg.application.port.inbound.MaterialAssetUseCase;
+import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialAsset;
-import com.timcritt.tfg.infrastructure.persistence.adapter.MaterialAssetRepositoryAdapter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
-@Service
 public class MaterialAssetUseCaseService implements MaterialAssetUseCase {
-    @Autowired
-    private MaterialAssetRepositoryAdapter repositoryAdapter;
+    private final MaterialAssetRepositoryPort repository;
+
+    public MaterialAssetUseCaseService(MaterialAssetRepositoryPort repository) {
+        this.repository = repository;
+    }
 
     @Override
     public Optional<MaterialAsset> getById(Long id) {
-        return repositoryAdapter.findById(id);
+        return repository.findById(id);
     }
 
     @Override
     public MaterialAsset save(MaterialAsset asset) {
-        return repositoryAdapter.save(asset);
+        return repository.save(asset);
     }
 
     @Override
     public List<MaterialAsset> findByMaterialNodeId(Long materialNodeId) {
-        return repositoryAdapter.findByMaterialNodeId(materialNodeId);
+        return repository.findByMaterialNodeId(materialNodeId);
     }
 }
