@@ -27,6 +27,7 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
     private String region;
 
     private MinioClient minioClient;
+    private MinioClient presignMinioClient;
 
     @PostConstruct
     public void init() {
@@ -35,12 +36,19 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
                 .credentials(accessKey, secretKey)
                 .region(region)
                 .build();
+
+        String presignEndpoint = (minioPublicUrl != null && !minioPublicUrl.isBlank()) ? minioPublicUrl : minioUrl;
+        this.presignMinioClient = MinioClient.builder()
+                .endpoint(presignEndpoint)
+                .credentials(accessKey, secretKey)
+                .region(region)
+                .build();
     }
 
     @Override
     public String generatePresignedUrl(String bucket, String objectKey, long expirationSeconds) {
         try {
-            String url = minioClient.getPresignedObjectUrl(
+            return presignMinioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.GET)
                             .bucket(bucket)
@@ -48,12 +56,6 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
                             .expiry((int) expirationSeconds)
                             .build()
             );
-            // Replace the internal MinIO URL with the public-facing URL so clients
-            // outside the Docker network can actually reach the object.
-            if (minioPublicUrl != null && !minioPublicUrl.isBlank() && !minioPublicUrl.equals(minioUrl)) {
-                url = url.replace(minioUrl, minioPublicUrl);
-            }
-            return url;
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate presigned URL", e);
         }
