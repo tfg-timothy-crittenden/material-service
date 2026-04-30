@@ -11,14 +11,14 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
 
-/**
- * Adapter for MinIO storage operations.
- */
+
 @Component
 public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
 
     @Value("${minio.url}")
     private String minioUrl;
+    @Value("${minio.public-url:#{null}}")
+    private String minioPublicUrl;
     @Value("${minio.access-key}")
     private String accessKey;
     @Value("${minio.secret-key}")
@@ -40,7 +40,7 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
     @Override
     public String generatePresignedUrl(String bucket, String objectKey, long expirationSeconds) {
         try {
-            return minioClient.getPresignedObjectUrl(
+            String url = minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.GET)
                             .bucket(bucket)
@@ -48,6 +48,12 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
                             .expiry((int) expirationSeconds)
                             .build()
             );
+            // Replace the internal MinIO URL with the public-facing URL so clients
+            // outside the Docker network can actually reach the object.
+            if (minioPublicUrl != null && !minioPublicUrl.isBlank() && !minioPublicUrl.equals(minioUrl)) {
+                url = url.replace(minioUrl, minioPublicUrl);
+            }
+            return url;
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate presigned URL", e);
         }
