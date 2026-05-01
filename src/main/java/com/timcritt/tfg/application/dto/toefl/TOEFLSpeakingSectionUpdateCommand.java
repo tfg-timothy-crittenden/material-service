@@ -24,6 +24,8 @@ public class TOEFLSpeakingSectionUpdateCommand {
     private String partTitle;
     /** If non-null, replaces the Part 1 image in storage and in the DB. */
     private UploadedFileCommand partImage;
+    /** If true, removes the existing Part 1 image asset. */
+    private Boolean removePartImage;
     /**
      * Partial updates for Part 1 questions.
      * Only entries that contain at least one non-null payload field are applied;

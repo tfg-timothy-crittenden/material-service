@@ -7,5 +7,6 @@ public interface TOEFLSpeakingMaterialCommandUseCase {
     Long uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand command);
     void updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand command);
     void publishSpeakingSection(Long materialId);
+    void deleteSpeakingSection(Long materialId);
 }
 

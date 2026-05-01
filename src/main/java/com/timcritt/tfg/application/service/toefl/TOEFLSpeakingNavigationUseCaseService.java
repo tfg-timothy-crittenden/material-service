@@ -156,6 +156,11 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
                 .toList();
     }
 
+    @Override
+    public List<MaterialAsset> getAssetsByMaterialNodeId(Long nodeId) {
+        return materialAssetRepository.findByMaterialNodeId(nodeId);
+    }
+
     private String findAudioStorageKey(Long questionNodeId) {
         return materialAssetRepository.findByMaterialNodeId(questionNodeId).stream()
                 .filter(a -> a.getKind() == MaterialAsset.Kind.AUDIO)

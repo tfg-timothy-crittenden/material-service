@@ -8,6 +8,7 @@ import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
 import com.timcritt.tfg.application.service.toefl.TOEFLSpeakingNavigationUseCaseService;
+import com.timcritt.tfg.domain.model.MaterialAsset;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +52,12 @@ public class TOEFLSpeakingNavigationServiceAdapter implements TOEFLSpeakingNavig
     @Transactional(readOnly = true)
     public List<SpeakingSectionSummary> getDraftSpeakingSectionSummaries() {
         return delegate.getDraftSpeakingSectionSummaries();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MaterialAsset> getAssetsByMaterialNodeId(Long nodeId) {
+        return delegate.getAssetsByMaterialNodeId(nodeId);
     }
 }
 

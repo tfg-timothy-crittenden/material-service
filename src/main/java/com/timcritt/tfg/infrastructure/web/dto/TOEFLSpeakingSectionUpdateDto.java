@@ -17,6 +17,7 @@ public class TOEFLSpeakingSectionUpdateDto {
 
     private String partTitle;
     private MultipartFile partImage;
+    private Boolean removePartImage;
 
     /**
      * Sparse list of Part 1 question updates.
@@ -38,6 +39,7 @@ public class TOEFLSpeakingSectionUpdateDto {
         /** JSON string representation of the question config object. */
         private String config;
         private MultipartFile audio;
+        private Boolean removeAudio;
     }
 }
 

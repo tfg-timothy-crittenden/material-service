@@ -5,11 +5,13 @@ import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
 import com.timcritt.tfg.infrastructure.security.authorization.MaterialId;
 import com.timcritt.tfg.infrastructure.security.authorization.RequireMaterialReadAccess;
 import com.timcritt.tfg.infrastructure.web.dto.DraftSaveResponseDto;
+import com.timcritt.tfg.infrastructure.web.dto.MaterialAssetDto;
 import com.timcritt.tfg.infrastructure.web.dto.MaterialNodeWithAssetsDto;
 import com.timcritt.tfg.infrastructure.web.dto.SpeakingSectionEditDto;
 import com.timcritt.tfg.infrastructure.web.dto.SpeakingSectionSummaryDto;
 import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingSectionUpdateDto;
 import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingSectionUploadDto;
+import com.timcritt.tfg.infrastructure.web.dtoMapper.MaterialAssetDtoMapper;
 import com.timcritt.tfg.infrastructure.web.dtoMapper.MaterialNodeWithAssetsDtoMapper;
 import com.timcritt.tfg.infrastructure.web.dtoMapper.SpeakingSectionEditDtoMapper;
 import com.timcritt.tfg.infrastructure.web.dtoMapper.SpeakingSectionSummaryDtoMapper;
@@ -121,5 +123,21 @@ public class TOEFLSpeakingController {
     public ResponseEntity<Void> publishSpeakingSection(@PathVariable Long materialId) {
         commandUseCase.publishSpeakingSection(materialId);
         return ResponseEntity.ok().build();
+    }
+    
+    @DeleteMapping("/material/{materialId}")
+    public ResponseEntity<Void> deleteSpeakingSection(@PathVariable Long materialId) {
+        commandUseCase.deleteSpeakingSection(materialId);
+        return ResponseEntity.ok().build();
+    }
+
+
+    @GetMapping("/material-nodes/{nodeId}/assets")
+    public ResponseEntity<List<MaterialAssetDto>> getAssetsByMaterialNodeId(@PathVariable Long nodeId) {
+        List<MaterialAssetDto> dtos = navigationUseCase.getAssetsByMaterialNodeId(nodeId)
+                .stream()
+                .map(MaterialAssetDtoMapper::toDto)
+                .toList();
+        return ResponseEntity.ok(dtos);
     }
 }

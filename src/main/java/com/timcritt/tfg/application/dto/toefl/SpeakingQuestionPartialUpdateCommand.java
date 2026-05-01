@@ -21,5 +21,7 @@ public class SpeakingQuestionPartialUpdateCommand {
     private Map<String, Object> config;
     /** If non-null, the existing audio asset is replaced with this file. */
     private UploadedFileCommand audio;
+    /** If true, removes the existing audio asset for this question. */
+    private Boolean removeAudio;
 }
 

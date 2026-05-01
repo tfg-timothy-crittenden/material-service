@@ -5,7 +5,9 @@ import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateComma
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
+import com.timcritt.tfg.application.dto.toefl.MaterialDeletedEvent;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
+import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
@@ -16,31 +18,39 @@ import com.timcritt.tfg.domain.model.MaterialNode;
 import com.timcritt.tfg.domain.model.MaterialStatus;
 
 import java.io.ByteArrayInputStream;
+import java.util.ArrayDeque;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMaterialCommandUseCase {
     private static final Long TOEFL_SKILL_ID = 4L;
     private static final Long TOEFL_EXAM_FAMILY_ID = 1L;
+    private static final int PART_1_QUESTION_COUNT = 7;
+    private static final int PART_2_QUESTION_COUNT = 4;
 
     private final MaterialRepositoryPort materialRepository;
     private final MaterialNodeRepositoryPort materialNodeRepository;
     private final MaterialAssetRepositoryPort materialAssetRepository;
     private final StorageRepositoryPort storageRepositoryPort;
+    private final MaterialDeletionEventPublisherPort deletionEventPublisher;
 
     public TOEFLSpeakingMaterialCommandService(
             MaterialRepositoryPort materialRepository,
             MaterialNodeRepositoryPort materialNodeRepository,
             MaterialAssetRepositoryPort materialAssetRepository,
-            StorageRepositoryPort storageRepositoryPort) {
+            StorageRepositoryPort storageRepositoryPort,
+            MaterialDeletionEventPublisherPort deletionEventPublisher) {
         this.materialRepository = materialRepository;
         this.materialNodeRepository = materialNodeRepository;
         this.materialAssetRepository = materialAssetRepository;
         this.storageRepositoryPort = storageRepositoryPort;
+        this.deletionEventPublisher = deletionEventPublisher;
     }
 
     @Override
@@ -57,14 +67,15 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         MaterialNode savedRootNode = createSectionRoot(effectiveTitle);
         Material savedMaterial = createMaterial(effectiveTitle, command.getMaterialDescription(), savedRootNode.getId(), MaterialStatus.DRAFT);
 
+        // Always create Part 1 and Part 2 to scaffold the full tree structure.
         MaterialNode part1Node = createPartNode(savedRootNode.getId(), command.getPartTitle(), 0);
         saveImageAsset(command.getPartImage(), part1Node.getId(), "speaking/part1/image");
         createQuestions(part1Node.getId(), command.getQuestions(), "speaking/part1/audio");
+        createMissingPlaceholderQuestions(part1Node.getId(), safeSize(command.getQuestions()), PART_1_QUESTION_COUNT);
 
-        if (hasText(command.getPart2Title()) || command.getPart2Questions() != null) {
-            MaterialNode part2Node = createPartNode(savedRootNode.getId(), command.getPart2Title(), 1);
-            createQuestions(part2Node.getId(), command.getPart2Questions(), "speaking/part2/audio");
-        }
+        MaterialNode part2Node = createPartNode(savedRootNode.getId(), command.getPart2Title(), 1);
+        createQuestions(part2Node.getId(), command.getPart2Questions(), "speaking/part2/audio");
+        createMissingPlaceholderQuestions(part2Node.getId(), safeSize(command.getPart2Questions()), PART_2_QUESTION_COUNT);
 
         return savedMaterial.getId();
     }
@@ -141,6 +152,50 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         material.setUpdatedAt(Instant.now());
         material.setVersion(material.getVersion() + 1);
         materialRepository.save(material);
+    }
+
+    @Override
+    public void deleteSpeakingSection(Long materialId) {
+        if (materialId == null) {
+            throw new IllegalArgumentException("materialId is required");
+        }
+
+        Material material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new IllegalArgumentException("Material not found: " + materialId));
+
+        Long rootNodeId = material.getMaterialNodeId();
+        if (rootNodeId != null) {
+            List<Long> nodeIds = collectSubtreeNodeIds(rootNodeId);
+            List<String> storageKeys = new ArrayList<>();
+
+            for (Long nodeId : nodeIds) {
+                for (MaterialAsset asset : materialAssetRepository.findByMaterialNodeId(nodeId)) {
+                    if (hasText(asset.getStorageKey())) {
+                        storageKeys.add(asset.getStorageKey());
+                    }
+                }
+            }
+
+            // DB-level ON DELETE CASCADE removes children and assets from relational tables.
+            materialNodeRepository.deleteById(rootNodeId);
+
+            // Best-effort object-store cleanup; never fail DB delete because object cleanup failed.
+            for (String key : storageKeys) {
+                try {
+                    storageRepositoryPort.deleteObject("toefl", key);
+                } catch (Exception ex) {
+                    // Intentionally swallowed; stale objects can be cleaned up later.
+                }
+            }
+        }
+
+        materialRepository.delete(materialId);
+
+        deletionEventPublisher.publishMaterialDeleted(MaterialDeletedEvent.builder()
+                .materialId(materialId)
+                .rootNodeId(rootNodeId)
+                .deletedAt(Instant.now())
+                .build());
     }
 
 
@@ -288,6 +343,62 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         }
     }
 
+    /**
+     * Creates any missing placeholder question nodes needed to scaffold the expected tree structure.
+     * These questions have no transcript text, config, or audio—they can be filled in later via PATCH.
+     */
+    private void createMissingPlaceholderQuestions(Long partNodeId, int existingQuestionCount, int expectedQuestionCount) {
+        Instant now = Instant.now();
+        for (int i = existingQuestionCount; i < expectedQuestionCount; i++) {
+            String title = "Question " + (i + 1);
+            MaterialNode questionNode = MaterialNode.builder()
+                    .id(null)
+                    .parentNodeId(partNodeId)
+                    .kind("ITEM")
+                    .title(title)
+                    .displayOrder(i)
+                    .skillId(TOEFL_SKILL_ID)
+                    .transcriptText(null)  // placeholder: empty
+                    .responseMode("SPOKEN")
+                    .responseRequired(true)
+                    .scoringMode("NONE")
+                    .config(new HashMap<>())  // placeholder: empty config
+                    .version(0L)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+            materialNodeRepository.save(questionNode);
+        }
+    }
+
+    private int safeSize(List<?> values) {
+        return values == null ? 0 : values.size();
+    }
+
+    private List<Long> collectSubtreeNodeIds(Long rootNodeId) {
+        List<Long> ids = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
+        ArrayDeque<Long> toVisit = new ArrayDeque<>();
+        toVisit.add(rootNodeId);
+
+        while (!toVisit.isEmpty()) {
+            Long currentId = toVisit.removeFirst();
+            if (!visited.add(currentId)) {
+                continue;
+            }
+            ids.add(currentId);
+
+            List<MaterialNode> children = materialNodeRepository.findByParentNodeId(currentId);
+            for (MaterialNode child : children) {
+                if (child.getId() != null) {
+                    toVisit.addLast(child.getId());
+                }
+            }
+        }
+
+        return ids;
+    }
+
     @Override
     public void updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand command) {
         if (command == null || command.getMaterialId() == null) {
@@ -296,8 +407,8 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
         // Track newly uploaded storage keys so we can delete them on failure (compensation).
         List<String> uploadedKeys = new ArrayList<>();
-        // Track replaced (old) storage keys so we can delete them on success (best-effort cleanup).
-        List<String> keysToDeleteAfterSuccess = new ArrayList<>();
+        Set<String> storageKeysBeforeUpdate = Set.of();
+        Set<String> storageKeysAfterUpdate = Set.of();
 
         try {
             // ── Load material and root section node ──────────────────────────────
@@ -305,6 +416,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                     .orElseThrow(() -> new IllegalArgumentException("Material not found: " + command.getMaterialId()));
             MaterialNode rootNode = materialNodeRepository.findById(material.getMaterialNodeId())
                     .orElseThrow(() -> new IllegalArgumentException("Root section node not found for material: " + command.getMaterialId()));
+            storageKeysBeforeUpdate = collectStorageKeysForSubtree(rootNode.getId());
 
             // ── Update material text fields ──────────────────────────────────────
             boolean materialDirty = false;
@@ -339,15 +451,19 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             }
 
             if (isFilePresent(command.getPartImage())) {
-                String oldKey = replaceAsset(command.getPartImage(), part1.getId(),
+                if (Boolean.TRUE.equals(command.getRemovePartImage())) {
+                    throw new IllegalArgumentException("partImage and removePartImage cannot both be set");
+                }
+                replaceAsset(command.getPartImage(), part1.getId(),
                         MaterialAsset.Kind.IMAGE, "part1/image", uploadedKeys);
-                if (oldKey != null) keysToDeleteAfterSuccess.add(oldKey);
+            } else if (Boolean.TRUE.equals(command.getRemovePartImage())) {
+                deleteAsset(part1.getId(), MaterialAsset.Kind.IMAGE);
             }
 
             if (command.getQuestions() != null) {
                 for (SpeakingQuestionPartialUpdateCommand q : command.getQuestions()) {
                     if (isEmptyQuestionUpdate(q)) continue;
-                    updateQuestionNode(q, part1.getId(), "part1/audio", uploadedKeys, keysToDeleteAfterSuccess);
+                    updateQuestionNode(q, part1.getId(), "part1/audio", uploadedKeys);
                 }
             }
 
@@ -372,10 +488,12 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 if (command.getPart2Questions() != null) {
                     for (SpeakingQuestionPartialUpdateCommand q : command.getPart2Questions()) {
                         if (isEmptyQuestionUpdate(q)) continue;
-                        updateQuestionNode(q, part2.getId(), "part2/audio", uploadedKeys, keysToDeleteAfterSuccess);
+                        updateQuestionNode(q, part2.getId(), "part2/audio", uploadedKeys);
                     }
                 }
             }
+
+            storageKeysAfterUpdate = collectStorageKeysForSubtree(rootNode.getId());
 
         } catch (Exception e) {
             // Compensation: delete any files that were successfully uploaded before the failure.
@@ -389,9 +507,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             throw e;
         }
 
-        // Post-success: best-effort removal of the storage objects that were replaced.
-        // If a delete fails, the old object becomes an orphan in the object store, which can be
-        // reconciled by a periodic cleanup job comparing storage keys against the DB.
+        // Post-success: best-effort removal of storage keys no longer referenced by this section.
+        Set<String> keysToDeleteAfterSuccess = new HashSet<>(storageKeysBeforeUpdate);
+        keysToDeleteAfterSuccess.removeAll(storageKeysAfterUpdate);
         for (String key : keysToDeleteAfterSuccess) {
             try {
                 storageRepositoryPort.deleteObject("toefl", key);
@@ -409,8 +527,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             SpeakingQuestionPartialUpdateCommand q,
             Long partNodeId,
             String audioPrefix,
-            List<String> uploadedKeys,
-            List<String> keysToDeleteAfterSuccess) {
+            List<String> uploadedKeys) {
 
         MaterialNode questionNode = materialNodeRepository.findByParentIdAndDisplayOrder(partNodeId, q.getIndex())
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -432,19 +549,21 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         }
 
         if (isFilePresent(q.getAudio())) {
-            String oldKey = replaceAsset(q.getAudio(), questionNode.getId(),
+            if (Boolean.TRUE.equals(q.getRemoveAudio())) {
+                throw new IllegalArgumentException("audio and removeAudio cannot both be set for question index " + q.getIndex());
+            }
+            replaceAsset(q.getAudio(), questionNode.getId(),
                     MaterialAsset.Kind.AUDIO, audioPrefix, uploadedKeys);
-            if (oldKey != null) keysToDeleteAfterSuccess.add(oldKey);
+        } else if (Boolean.TRUE.equals(q.getRemoveAudio())) {
+            deleteAsset(questionNode.getId(), MaterialAsset.Kind.AUDIO);
         }
     }
 
     /**
      * Uploads {@code file} to storage and updates (or creates) the matching {@link MaterialAsset}
      * DB record for {@code materialNodeId}/{@code kind}.
-     *
-     * @return the old storage key if an asset was replaced, or {@code null} if a new one was created.
      */
-    private String replaceAsset(
+    private void replaceAsset(
             UploadedFileCommand file,
             Long materialNodeId,
             MaterialAsset.Kind kind,
@@ -462,9 +581,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 .findFirst()
                 .orElse(null);
 
-        String oldKey = null;
         if (asset != null) {
-            oldKey = asset.getStorageKey();
             asset.setStorageKey(newKey);
             asset.setOriginalFilename(originalFilename);
             asset.setMimeType(file.getContentType());
@@ -487,7 +604,26 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             asset.setUpdatedAt(now);
         }
         materialAssetRepository.save(asset);
-        return oldKey;
+    }
+
+    private Set<String> collectStorageKeysForSubtree(Long rootNodeId) {
+        Set<String> keys = new HashSet<>();
+        for (Long nodeId : collectSubtreeNodeIds(rootNodeId)) {
+            for (MaterialAsset asset : materialAssetRepository.findByMaterialNodeId(nodeId)) {
+                if (hasText(asset.getStorageKey())) {
+                    keys.add(asset.getStorageKey());
+                }
+            }
+        }
+        return keys;
+    }
+
+    private void deleteAsset(Long materialNodeId, MaterialAsset.Kind kind) {
+        for (MaterialAsset asset : materialAssetRepository.findByMaterialNodeId(materialNodeId)) {
+            if (asset.getKind() == kind && asset.getId() != null) {
+                materialAssetRepository.deleteById(asset.getId());
+            }
+        }
     }
 
     private boolean isFilePresent(UploadedFileCommand file) {
@@ -496,7 +632,10 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
     private boolean isEmptyQuestionUpdate(SpeakingQuestionPartialUpdateCommand q) {
         if (q == null) return true;
-        return !hasText(q.getTranscriptText()) && q.getConfig() == null && !isFilePresent(q.getAudio());
+        return !hasText(q.getTranscriptText())
+                && q.getConfig() == null
+                && !isFilePresent(q.getAudio())
+                && !Boolean.TRUE.equals(q.getRemoveAudio());
     }
 
     private boolean hasText(String value) {

@@ -94,6 +94,7 @@ public final class TOEFLSpeakingUploadCommandMapper {
                 .materialDescription(dto.getMaterialDescription())
                 .partTitle(dto.getPartTitle())
                 .partImage(toUploadedFile(dto.getPartImage(), "partImage"))
+                .removePartImage(Boolean.TRUE.equals(dto.getRemovePartImage()))
                 .questions(toPartialUpdateCommands(dto.getQuestions(), "questions"))
                 .part2Title(dto.getPart2Title())
                 .part2Questions(toPartialUpdateCommands(dto.getPart2Questions(), "part2Questions"))
@@ -112,12 +113,14 @@ public final class TOEFLSpeakingUploadCommandMapper {
             boolean hasAudio = q.getAudio() != null && !q.getAudio().isEmpty();
             boolean hasText = q.getTranscriptText() != null && !q.getTranscriptText().isBlank();
             boolean hasConfig = q.getConfig() != null;
-            if (!hasAudio && !hasText && !hasConfig) continue; // sparse list: skip empty slots
+            boolean removeAudio = Boolean.TRUE.equals(q.getRemoveAudio());
+            if (!hasAudio && !hasText && !hasConfig && !removeAudio) continue; // sparse list: skip empty slots
             commands.add(SpeakingQuestionPartialUpdateCommand.builder()
                     .index(i)
                     .transcriptText(q.getTranscriptText())
                     .config(hasConfig ? parseConfig(q.getConfig(), fieldName + "[" + i + "]") : null)
                     .audio(toUploadedFile(q.getAudio(), fieldName + "[" + i + "].audio"))
+                    .removeAudio(removeAudio)
                     .build());
         }
         return commands;

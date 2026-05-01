@@ -16,10 +16,10 @@ import java.util.stream.Collectors;
 public class SpeakingMultipartFieldValidator {
 
     private static final Pattern UPDATE_QUESTION_FIELD_PATTERN =
-            Pattern.compile("^(questions|part2Questions)\\[\\d+]\\.(transcriptText|config|audio)$");
+            Pattern.compile("^(questions|part2Questions)\\[\\d+]\\.(transcriptText|config|audio|removeAudio)$");
 
     private static final Set<String> UPDATE_STATIC_FIELDS = Set.of(
-            "materialTitle", "materialDescription", "partTitle", "partImage", "part2Title");
+            "materialId", "materialTitle", "materialDescription", "partTitle", "partImage", "removePartImage", "part2Title");
 
 
     public void validateSectionUpload(HttpServletRequest request, TOEFLSpeakingSectionUploadDto dto) {
