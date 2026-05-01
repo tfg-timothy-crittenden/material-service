@@ -16,29 +16,7 @@ public class ExamFamilyUseCaseService implements ExamFamilyUseCase {
     }
 
     @Override
-    public ExamFamily createTest(String newName) {
-        ExamFamily newItem = new ExamFamily();
-        newItem.setName(newName);
-        repository.save(newItem);
-        return newItem;
-    }
-
-    @Override
     public ExamFamily getTestById(Long id) {
         return repository.findById(id).orElseThrow();
-    }
-
-    @Override
-    public ExamFamily updateTest(Long id, String newName) {
-        ExamFamily existing = repository.findById(id).orElseThrow();
-        existing.setName(newName);
-        repository.save(existing);
-        return existing;
-    }
-
-    @Override
-    public Boolean deleteTest(Long id) {
-        ExamFamily existing = repository.findById(id).orElseThrow();
-        return repository.delete(existing.getId());
     }
 }

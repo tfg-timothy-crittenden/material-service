@@ -22,26 +22,8 @@ public class ExamFamilyServiceAdapter implements ExamFamilyUseCase {
     }
 
     @Override
-    @Transactional
-    public ExamFamily createTest(String newName) {
-        return delegate.createTest(newName);
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public ExamFamily getTestById(Long id) {
         return delegate.getTestById(id);
-    }
-
-    @Override
-    @Transactional
-    public ExamFamily updateTest(Long id, String newName) {
-        return delegate.updateTest(id, newName);
-    }
-
-    @Override
-    @Transactional
-    public Boolean deleteTest(Long id) {
-        return delegate.deleteTest(id);
     }
 }

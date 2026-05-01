@@ -12,13 +12,16 @@ public final class SpeakingSectionSummaryDtoMapper {
             return null;
         }
         return SpeakingSectionSummaryDto.builder()
+                .materialId(summary.getMaterialId())
                 .sectionId(summary.getSectionId())
                 .sectionTitle(summary.getSectionTitle())
                 .part1Id(summary.getPart1Id())
                 .part1Title(summary.getPart1Title())
                 .part2Id(summary.getPart2Id())
                 .part2Title(summary.getPart2Title())
+                .status(summary.getStatus())
+                .createdAt(summary.getCreatedAt())
+                .updatedAt(summary.getUpdatedAt())
                 .build();
     }
 }
-

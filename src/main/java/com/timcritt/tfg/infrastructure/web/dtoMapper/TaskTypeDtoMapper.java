@@ -18,19 +18,4 @@ public class TaskTypeDtoMapper {
                 .updatedAt(taskType.getUpdatedAt())
                 .build();
     }
-
-    public static TaskType toDomain(TaskTypeDto dto) {
-        if (dto == null) return null;
-        TaskType taskType = new TaskType();
-        taskType.setId(dto.getId());
-        taskType.setName(dto.getName());
-        taskType.setDescription(dto.getDescription());
-        taskType.setExamFamilyId(dto.getExamFamilyId());
-        taskType.setSkillId(dto.getSkillId());
-        taskType.setConfigSchema(dto.getConfigSchema());
-        taskType.setVersion(dto.getVersion());
-        taskType.setCreatedAt(dto.getCreatedAt());
-        taskType.setUpdatedAt(dto.getUpdatedAt());
-        return taskType;
-    }
 }

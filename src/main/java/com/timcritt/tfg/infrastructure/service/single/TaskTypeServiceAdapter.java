@@ -19,12 +19,6 @@ public class TaskTypeServiceAdapter implements TaskTypeUseCase {
     }
 
     @Override
-    @Transactional
-    public TaskType createTaskType(TaskType taskType) {
-        return delegate.createTaskType(taskType);
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public Optional<TaskType> findTaskTypeById(Long id) {
         return delegate.findTaskTypeById(id);
@@ -34,18 +28,6 @@ public class TaskTypeServiceAdapter implements TaskTypeUseCase {
     @Transactional(readOnly = true)
     public List<TaskType> findAllTaskTypes() {
         return delegate.findAllTaskTypes();
-    }
-
-    @Override
-    @Transactional
-    public TaskType updateTaskType(TaskType taskType) {
-        return delegate.updateTaskType(taskType);
-    }
-
-    @Override
-    @Transactional
-    public void deleteTaskType(Long id) {
-        delegate.deleteTaskType(id);
     }
 }
 

@@ -17,16 +17,5 @@ public class ExamFamilyEntityMapper {
         return domain;
     }
 
-    public static ExamFamilyJpaEntity toEntity(ExamFamily domain) {
-        ExamFamilyJpaEntity entity = new ExamFamilyJpaEntity();
-        entity.setId(domain.getId());
-        entity.setCode(domain.getCode());
-        entity.setName(domain.getName());
-        entity.setDescription(domain.getDescription());
-        entity.setUpdatedAt(domain.getUpdatedAt());
-        entity.setCreatedAt(domain.getCreatedAt());
-        entity.setVersion(domain.getVersion());
-        return entity;
-    }
 
 }

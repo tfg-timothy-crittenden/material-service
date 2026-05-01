@@ -47,4 +47,10 @@ public class MaterialRepositoryAdapter implements MaterialRepositoryPort {
                 .map(MaterialEntityMapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public Optional<Material> findByMaterialNodeId(Long materialNodeId) {
+        return repository.findByMaterialNodeId(materialNodeId)
+                .map(MaterialEntityMapper::toDomain);
+    }
 }

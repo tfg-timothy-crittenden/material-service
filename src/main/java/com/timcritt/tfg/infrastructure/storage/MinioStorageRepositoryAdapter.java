@@ -31,12 +31,15 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
 
     @PostConstruct
     public void init() {
+        // Internal endpoint used by the service container for upload/delete operations.
         this.minioClient = MinioClient.builder()
                 .endpoint(minioUrl)
                 .credentials(accessKey, secretKey)
                 .region(region)
                 .build();
 
+        // Presigned URLs must be signed with the same host clients will call (host is part of SigV4).
+        // We therefore sign against minio.public-url when set, and fall back to minio.url otherwise.
         String presignEndpoint = (minioPublicUrl != null && !minioPublicUrl.isBlank()) ? minioPublicUrl : minioUrl;
         this.presignMinioClient = MinioClient.builder()
                 .endpoint(presignEndpoint)

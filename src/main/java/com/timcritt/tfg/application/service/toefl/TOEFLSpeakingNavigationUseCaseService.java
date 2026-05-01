@@ -11,6 +11,7 @@ import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialNode;
 import com.timcritt.tfg.domain.model.MaterialAsset;
+import com.timcritt.tfg.domain.model.MaterialStatus;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -81,6 +82,15 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
 
     @Override
     public List<SpeakingSectionSummary> getAllSpeakingSectionSummaries() {
+        return getSpeakingSectionSummariesByStatus(MaterialStatus.PUBLISHED);
+    }
+
+    @Override
+    public List<SpeakingSectionSummary> getDraftSpeakingSectionSummaries() {
+        return getSpeakingSectionSummariesByStatus(MaterialStatus.DRAFT);
+    }
+
+    private List<SpeakingSectionSummary> getSpeakingSectionSummariesByStatus(MaterialStatus status) {
         List<SpeakingSectionSummary> result = new ArrayList<>();
         // Find all SECTION nodes (root nodes for speaking sections)
         List<MaterialNode> sections = materialNodeRepository.findByKind("SECTION");
@@ -100,13 +110,21 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
                     part2Title = part.getTitle();
                 }
             }
+            Material mat = materialRepository.findByMaterialNodeId(section.getId()).orElse(null);
+            if (mat == null || mat.getStatus() != status) {
+                continue;
+            }
             result.add(SpeakingSectionSummary.builder()
+                    .materialId(mat.getId())
                     .sectionId(section.getId())
                     .sectionTitle(section.getTitle())
                     .part1Id(part1Id)
                     .part1Title(part1Title)
                     .part2Id(part2Id)
                     .part2Title(part2Title)
+                    .status(mat.getStatus())
+                    .createdAt(mat.getCreatedAt())
+                    .updatedAt(mat.getUpdatedAt())
                     .build());
         }
         return result;

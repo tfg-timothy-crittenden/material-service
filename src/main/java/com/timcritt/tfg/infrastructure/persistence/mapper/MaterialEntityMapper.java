@@ -1,5 +1,6 @@
 package com.timcritt.tfg.infrastructure.persistence.mapper;
 import com.timcritt.tfg.domain.model.Material;
+import com.timcritt.tfg.domain.model.MaterialStatus;
 import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialJpaEntity;
 
 public class MaterialEntityMapper {
@@ -13,6 +14,7 @@ public class MaterialEntityMapper {
                 .description(entity.getDescription())
                 .authorId(entity.getAuthorId())
                 .ownerOrgId(entity.getOwnerOrgId())
+                .status(entity.getStatus())
                 .version(entity.getVersion())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -29,6 +31,8 @@ public class MaterialEntityMapper {
                 .description(domain.getDescription())
                 .authorId(domain.getAuthorId())
                 .ownerOrgId(domain.getOwnerOrgId())
+                // Default to DRAFT if not explicitly set – prevents accidental null.
+                .status(domain.getStatus() != null ? domain.getStatus() : MaterialStatus.DRAFT)
                 .version(domain.getVersion())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())

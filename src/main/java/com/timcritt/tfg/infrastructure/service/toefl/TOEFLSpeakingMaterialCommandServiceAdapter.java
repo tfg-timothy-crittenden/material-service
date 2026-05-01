@@ -1,6 +1,5 @@
 package com.timcritt.tfg.infrastructure.service.toefl;
 
-import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingPart1UploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
@@ -29,22 +28,23 @@ public class TOEFLSpeakingMaterialCommandServiceAdapter implements TOEFLSpeaking
         );
     }
 
-    @Override
-    @Transactional
-    public void uploadSpeakingPart1(TOEFLSpeakingPart1UploadCommand command) {
-        delegate.uploadSpeakingPart1(command);
-    }
 
     @Override
     @Transactional
-    public void uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand command) {
-        delegate.uploadSpeakingSection(command);
+    public Long uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand command) {
+        return delegate.uploadSpeakingSection(command);
     }
 
     @Override
     @Transactional
     public void updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand command) {
         delegate.updateSpeakingSection(command);
+    }
+
+    @Override
+    @Transactional
+    public void publishSpeakingSection(Long materialId) {
+        delegate.publishSpeakingSection(materialId);
     }
 }
 

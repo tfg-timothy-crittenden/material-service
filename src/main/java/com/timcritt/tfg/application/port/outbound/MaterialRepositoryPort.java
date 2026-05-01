@@ -10,4 +10,5 @@ public interface MaterialRepositoryPort {
     Boolean delete(Long id);
     List<Material> findByExamFamilyId(Long examFamilyId);
     List<Material> findAll();
+    Optional<Material> findByMaterialNodeId(Long materialNodeId);
 }

@@ -10,18 +10,6 @@ import java.util.Optional;
 public interface MaterialNodeJpaRepository extends JpaRepository<MaterialNodeJpaEntity, Long> {
     List<MaterialNodeJpaEntity> findByParentNodeId(Long parentNodeId);
 
-    // Recursive CTE to get all descendants of a node (including the root)
-    //Can be used to search from any point in the material_node tree
-    @Query(value = """
-        WITH RECURSIVE descendants AS (
-            SELECT * FROM material_node WHERE id = :rootId
-            UNION ALL
-            SELECT mn.* FROM material_node mn
-            INNER JOIN descendants d ON mn.parent_node_id = d.id
-        )
-        SELECT * FROM descendants;
-    """, nativeQuery = true)
-    List<MaterialNodeJpaEntity> findAllDescendantsByRootId(@Param("rootId") Long rootId);
 
     List<MaterialNodeJpaEntity> findByKind(String kind);
 

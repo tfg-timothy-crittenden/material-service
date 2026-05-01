@@ -47,13 +47,6 @@ public class MaterialNodeRepositoryAdapter implements MaterialNodeRepositoryPort
                 .collect(Collectors.toList());
     }
 
-    @Override
-    public List<MaterialNode> findAllDescendantsByRootId(Long sectionId) {
-        return jpaRepository.findAllDescendantsByRootId(sectionId)
-                .stream()
-                .map(MaterialNodeEntityMapper::toDomain)
-                .collect(Collectors.toList());
-    }
 
     @Override
     public List<MaterialNode> findByKind(String kind) {
@@ -75,13 +68,5 @@ public class MaterialNodeRepositoryAdapter implements MaterialNodeRepositoryPort
     public Optional<MaterialNode> findByParentIdAndDisplayOrder(Long parentId, Integer displayOrder) {
         return jpaRepository.findByParentNodeIdAndDisplayOrder(parentId, displayOrder)
                 .map(MaterialNodeEntityMapper::toDomain);
-    }
-
-    @Override
-    public List<MaterialNode> findByParentId(Long parentId) {
-        return jpaRepository.findByParentNodeId(parentId)
-                .stream()
-                .map(MaterialNodeEntityMapper::toDomain)
-                .toList();
     }
 }

@@ -19,24 +19,8 @@ public class ExamFamilyController {
         this.useCase = useCase;
     }
 
-    @PostMapping("/{name}")
-    public ResponseEntity<ExamFamilyDto> create(@PathVariable String name) {
-        return ResponseEntity.ok(ExamFamilyDtoMapper.toDto(useCase.createTest(name)));
-    }
-
     @GetMapping("/{id}")
     public ResponseEntity<ExamFamilyDto> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ExamFamilyDtoMapper.toDto(useCase.getTestById(id)));
-    }
-
-    @PatchMapping("/{id}")
-    public ResponseEntity<ExamFamilyDto> update(@PathVariable Long id, @RequestBody ExamFamilyDto dto) {
-        return ResponseEntity.ok(ExamFamilyDtoMapper.toDto(useCase.updateTest(id, dto.getName())));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        useCase.deleteTest(id);
-        return ResponseEntity.noContent().build();
     }
 }

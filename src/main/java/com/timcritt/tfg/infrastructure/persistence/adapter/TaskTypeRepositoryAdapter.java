@@ -2,7 +2,6 @@ package com.timcritt.tfg.infrastructure.persistence.adapter;
 
 import com.timcritt.tfg.application.port.outbound.TaskTypeRepositoryPort;
 import com.timcritt.tfg.domain.model.TaskType;
-import com.timcritt.tfg.infrastructure.persistence.jpa.TaskTypeJpaEntity;
 import com.timcritt.tfg.infrastructure.persistence.spring.TaskTypeJpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
@@ -18,13 +17,6 @@ public class TaskTypeRepositoryAdapter implements TaskTypeRepositoryPort {
     }
 
     @Override
-    public TaskType save(TaskType taskType) {
-        TaskTypeJpaEntity entity = TaskTypeEntityMapper.toEntity(taskType);
-        TaskTypeJpaEntity saved = jpaRepository.save(entity);
-        return TaskTypeEntityMapper.toDomain(saved);
-    }
-
-    @Override
     public Optional<TaskType> findById(Long id) {
         return jpaRepository.findById(id).map(TaskTypeEntityMapper::toDomain);
     }
@@ -34,11 +26,6 @@ public class TaskTypeRepositoryAdapter implements TaskTypeRepositoryPort {
         return jpaRepository.findAll().stream()
                 .map(TaskTypeEntityMapper::toDomain)
                 .collect(Collectors.toList());
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
     }
 }
 

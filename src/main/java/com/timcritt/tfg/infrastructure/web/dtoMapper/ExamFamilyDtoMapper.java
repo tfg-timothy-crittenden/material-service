@@ -17,16 +17,4 @@ public final class ExamFamilyDtoMapper {
         dto.setUpdatedAt(d.getUpdatedAt());
         return dto;
     }
-
-    public static ExamFamily toDomain(ExamFamilyDto dto) {
-        if (dto == null) return null;
-        ExamFamily domain = new ExamFamily();
-        domain.setId(dto.getId());
-        domain.setName(dto.getName());
-        domain.setDescription(dto.getDescription());
-        domain.setVersion(dto.getVersion());
-        domain.setCreatedAt(dto.getCreatedAt());
-        domain.setUpdatedAt(dto.getUpdatedAt());
-        return domain;
-    }
 }

@@ -11,5 +11,6 @@ public interface TOEFLSpeakingNavigationUseCase {
     Optional<MaterialNodeWithAssetsResult> getQuestion(Long materialId, int partOrder, int questionOrder);
     Optional<SpeakingSectionEditResult> getSpeakingSectionForEdit(Long materialId);
     List<SpeakingSectionSummary> getAllSpeakingSectionSummaries();
+    List<SpeakingSectionSummary> getDraftSpeakingSectionSummaries();
 }
 

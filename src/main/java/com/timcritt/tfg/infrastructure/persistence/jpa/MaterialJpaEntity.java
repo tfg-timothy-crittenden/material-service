@@ -1,4 +1,5 @@
 package com.timcritt.tfg.infrastructure.persistence.jpa;
+import com.timcritt.tfg.domain.model.MaterialStatus;
 import lombok.*;
 import jakarta.persistence.*;
 import java.time.Instant;
@@ -41,4 +42,8 @@ public class MaterialJpaEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Column(name = "status", nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    private MaterialStatus status;
 }

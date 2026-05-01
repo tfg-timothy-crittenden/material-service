@@ -2,7 +2,6 @@ package com.timcritt.tfg.application.service.toefl;
 
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateCommand;
-import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingPart1UploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
@@ -14,6 +13,7 @@ import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.MaterialNode;
+import com.timcritt.tfg.domain.model.MaterialStatus;
 
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMaterialCommandUseCase {
     private static final Long TOEFL_SKILL_ID = 4L;
@@ -45,80 +44,105 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     }
 
     @Override
-    public void uploadSpeakingPart1(TOEFLSpeakingPart1UploadCommand command) {
-        validatePart1(command);
+    public Long uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("payload is required");
+        }
 
-        MaterialNode savedRootNode = createSectionRoot(command.getMaterialTitle());
-        createMaterial(command.getMaterialTitle(), command.getMaterialDescription(), savedRootNode.getId());
+        // Auto-fill title so the DB NOT NULL constraint is always satisfied for drafts.
+        String effectiveTitle = hasText(command.getMaterialTitle())
+                ? command.getMaterialTitle()
+                : "Untitled Draft";
+
+        MaterialNode savedRootNode = createSectionRoot(effectiveTitle);
+        Material savedMaterial = createMaterial(effectiveTitle, command.getMaterialDescription(), savedRootNode.getId(), MaterialStatus.DRAFT);
 
         MaterialNode part1Node = createPartNode(savedRootNode.getId(), command.getPartTitle(), 0);
-        saveImageAsset(command.getPartImage(), part1Node.getId(), "part1/image");
-        createQuestions(part1Node.getId(), command.getQuestions(), "part1/audio");
+        saveImageAsset(command.getPartImage(), part1Node.getId(), "speaking/part1/image");
+        createQuestions(part1Node.getId(), command.getQuestions(), "speaking/part1/audio");
+
+        if (hasText(command.getPart2Title()) || command.getPart2Questions() != null) {
+            MaterialNode part2Node = createPartNode(savedRootNode.getId(), command.getPart2Title(), 1);
+            createQuestions(part2Node.getId(), command.getPart2Questions(), "speaking/part2/audio");
+        }
+
+        return savedMaterial.getId();
     }
 
     @Override
-    public void uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand command) {
-        validatePart1Section(command);
-        validatePart2(command);
+    public void publishSpeakingSection(Long materialId) {
+        Material material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new IllegalArgumentException("Material not found: " + materialId));
 
-        MaterialNode savedRootNode = createSectionRoot(command.getMaterialTitle());
-        createMaterial(command.getMaterialTitle(), command.getMaterialDescription(), savedRootNode.getId());
+        if (material.getStatus() == MaterialStatus.PUBLISHED) {
+            return; // idempotent – already published
+        }
 
-        MaterialNode part1Node = createPartNode(savedRootNode.getId(), command.getPartTitle(), 0);
-        saveImageAsset(command.getPartImage(), part1Node.getId(), "part1/image");
-        createQuestions(part1Node.getId(), command.getQuestions(), "part1/audio");
+        // ── Completeness validation ───────────────────────────────────────────
+        if (!hasText(material.getTitle()) || "Untitled Draft".equals(material.getTitle())) {
+            throw new IllegalStateException("Cannot publish: material title is required");
+        }
 
-        MaterialNode part2Node = createPartNode(savedRootNode.getId(), command.getPart2Title(), 1);
-        createQuestions(part2Node.getId(), command.getPart2Questions(), "part2/audio");
+        MaterialNode rootNode = materialNodeRepository.findById(material.getMaterialNodeId())
+                .orElseThrow(() -> new IllegalStateException("Cannot publish: section node not found"));
+
+        MaterialNode part1 = materialNodeRepository.findByParentIdAndDisplayOrder(rootNode.getId(), 0)
+                .orElseThrow(() -> new IllegalStateException("Cannot publish: Part 1 is missing"));
+
+        if (!hasText(part1.getTitle())) {
+            throw new IllegalStateException("Cannot publish: Part 1 title is required");
+        }
+
+        boolean part1HasImage = materialAssetRepository.findByMaterialNodeId(part1.getId()).stream()
+                .anyMatch(a -> a.getKind() == MaterialAsset.Kind.IMAGE);
+        if (!part1HasImage) {
+            throw new IllegalStateException("Cannot publish: Part 1 image is required");
+        }
+
+        List<MaterialNode> part1Questions = materialNodeRepository.findByParentNodeId(part1.getId());
+        if (part1Questions.isEmpty()) {
+            throw new IllegalStateException("Cannot publish: Part 1 must have at least one question");
+        }
+        for (MaterialNode q : part1Questions) {
+            if (!hasText(q.getTranscriptText())) {
+                throw new IllegalStateException("Cannot publish: all Part 1 questions must have transcript text");
+            }
+            boolean hasAudio = materialAssetRepository.findByMaterialNodeId(q.getId()).stream()
+                    .anyMatch(a -> a.getKind() == MaterialAsset.Kind.AUDIO);
+            if (!hasAudio) {
+                throw new IllegalStateException("Cannot publish: Part 1 question " + q.getDisplayOrder() + " is missing audio");
+            }
+        }
+
+        MaterialNode part2 = materialNodeRepository.findByParentIdAndDisplayOrder(rootNode.getId(), 1)
+                .orElseThrow(() -> new IllegalStateException("Cannot publish: Part 2 is missing"));
+
+        if (!hasText(part2.getTitle())) {
+            throw new IllegalStateException("Cannot publish: Part 2 title is required");
+        }
+
+        List<MaterialNode> part2Questions = materialNodeRepository.findByParentNodeId(part2.getId());
+        if (part2Questions.size() != 4) {
+            throw new IllegalStateException("Cannot publish: Part 2 must have exactly 4 questions (found " + part2Questions.size() + ")");
+        }
+        for (MaterialNode q : part2Questions) {
+            if (!hasText(q.getTranscriptText())) {
+                throw new IllegalStateException("Cannot publish: all Part 2 questions must have transcript text");
+            }
+            boolean hasAudio = materialAssetRepository.findByMaterialNodeId(q.getId()).stream()
+                    .anyMatch(a -> a.getKind() == MaterialAsset.Kind.AUDIO);
+            if (!hasAudio) {
+                throw new IllegalStateException("Cannot publish: Part 2 question " + q.getDisplayOrder() + " is missing audio");
+            }
+        }
+
+        // ── Flip status ───────────────────────────────────────────────────────
+        material.setStatus(MaterialStatus.PUBLISHED);
+        material.setUpdatedAt(Instant.now());
+        material.setVersion(material.getVersion() + 1);
+        materialRepository.save(material);
     }
 
-    private void validatePart1(TOEFLSpeakingPart1UploadCommand command) {
-        if (command == null) {
-            throw new IllegalArgumentException("payload is required");
-        }
-        if (!hasText(command.getMaterialTitle())) {
-            throw new IllegalArgumentException("materialTitle is required");
-        }
-        if (!hasText(command.getPartTitle())) {
-            throw new IllegalArgumentException("partTitle is required");
-        }
-        if (command.getQuestions() == null || command.getQuestions().isEmpty()) {
-            throw new IllegalArgumentException("questions are required");
-        }
-        if (command.getPartImage() == null || command.getPartImage().getBytes() == null || command.getPartImage().getBytes().length == 0) {
-            throw new IllegalArgumentException("partImage is required and must not be empty");
-        }
-        validateQuestions(command.getQuestions(), "questions", true);
-    }
-
-    private void validatePart1Section(TOEFLSpeakingSectionUploadCommand command) {
-        if (command == null) {
-            throw new IllegalArgumentException("payload is required");
-        }
-        if (!hasText(command.getMaterialTitle())) {
-            throw new IllegalArgumentException("materialTitle is required");
-        }
-        if (!hasText(command.getPartTitle())) {
-            throw new IllegalArgumentException("partTitle is required");
-        }
-        if (command.getQuestions() == null || command.getQuestions().isEmpty()) {
-            throw new IllegalArgumentException("questions are required");
-        }
-        if (command.getPartImage() == null || command.getPartImage().getBytes() == null || command.getPartImage().getBytes().length == 0) {
-            throw new IllegalArgumentException("partImage is required and must not be empty");
-        }
-        validateQuestions(command.getQuestions(), "questions", true);
-    }
-
-    private void validatePart2(TOEFLSpeakingSectionUploadCommand command) {
-        if (!hasText(command.getPart2Title())) {
-            throw new IllegalArgumentException("part2Title is required");
-        }
-        if (command.getPart2Questions() == null || command.getPart2Questions().size() != 4) {
-            throw new IllegalArgumentException("part2Questions must contain exactly 4 questions");
-        }
-        validateQuestions(command.getPart2Questions(), "part2Questions", false);
-    }
 
     private void validateQuestions(List<SpeakingQuestionUploadCommand> questions, String fieldName, boolean requireConfig) {
         for (int i = 0; i < questions.size(); i++) {
@@ -159,7 +183,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         return materialNodeRepository.save(sectionNode);
     }
 
-    private void createMaterial(String materialTitle, String materialDescription, Long rootNodeId) {
+    private Material createMaterial(String materialTitle, String materialDescription, Long rootNodeId, MaterialStatus status) {
         Instant now = Instant.now();
         Material material = Material.builder()
                 .id(null)
@@ -169,11 +193,12 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 .description(materialDescription)
                 .authorId(null)
                 .ownerOrgId(null)
+                .status(status)
                 .version(0L)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
-        materialRepository.save(material);
+        return materialRepository.save(material);
     }
 
     private MaterialNode createPartNode(Long parentNodeId, String title, int displayOrder) {

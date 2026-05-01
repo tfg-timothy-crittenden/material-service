@@ -16,5 +16,5 @@ public final class MaterialAssetDtoMapper {
             .build();
     }
 
-    // Optionally, add fromDto if needed
+
 }

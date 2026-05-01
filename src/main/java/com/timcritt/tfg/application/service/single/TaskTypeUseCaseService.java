@@ -14,11 +14,6 @@ public class TaskTypeUseCaseService implements TaskTypeUseCase {
     }
 
     @Override
-    public TaskType createTaskType(TaskType taskType) {
-        return repository.save(taskType);
-    }
-
-    @Override
     public Optional<TaskType> findTaskTypeById(Long id) {
         return repository.findById(id);
     }
@@ -26,16 +21,6 @@ public class TaskTypeUseCaseService implements TaskTypeUseCase {
     @Override
     public List<TaskType> findAllTaskTypes() {
         return repository.findAll();
-    }
-
-    @Override
-    public TaskType updateTaskType(TaskType taskType) {
-        return repository.save(taskType);
-    }
-
-    @Override
-    public void deleteTaskType(Long id) {
-        repository.deleteById(id);
     }
 }
 

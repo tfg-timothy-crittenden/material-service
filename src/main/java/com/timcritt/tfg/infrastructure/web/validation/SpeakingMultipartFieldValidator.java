@@ -1,6 +1,5 @@
 package com.timcritt.tfg.infrastructure.web.validation;
 
-import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingPart1UploadDto;
 import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingSectionUploadDto;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
@@ -22,13 +21,6 @@ public class SpeakingMultipartFieldValidator {
     private static final Set<String> UPDATE_STATIC_FIELDS = Set.of(
             "materialTitle", "materialDescription", "partTitle", "partImage", "part2Title");
 
-    public void validatePart1Upload(HttpServletRequest request, TOEFLSpeakingPart1UploadDto dto) {
-        Set<String> allowedFields = new HashSet<>(Arrays.asList(
-                "materialTitle", "materialDescription", "materialId", "partImage", "partTitle"
-        ));
-        addQuestionFields(allowedFields, "questions", dto.getQuestions() != null ? dto.getQuestions().size() : 0);
-        validateUnexpectedMultipartFields(request, allowedFields);
-    }
 
     public void validateSectionUpload(HttpServletRequest request, TOEFLSpeakingSectionUploadDto dto) {
         Set<String> allowedFields = new HashSet<>(Arrays.asList(

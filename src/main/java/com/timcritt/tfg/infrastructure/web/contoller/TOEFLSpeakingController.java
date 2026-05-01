@@ -4,10 +4,10 @@ import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUse
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
 import com.timcritt.tfg.infrastructure.security.authorization.MaterialId;
 import com.timcritt.tfg.infrastructure.security.authorization.RequireMaterialReadAccess;
+import com.timcritt.tfg.infrastructure.web.dto.DraftSaveResponseDto;
 import com.timcritt.tfg.infrastructure.web.dto.MaterialNodeWithAssetsDto;
 import com.timcritt.tfg.infrastructure.web.dto.SpeakingSectionEditDto;
 import com.timcritt.tfg.infrastructure.web.dto.SpeakingSectionSummaryDto;
-import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingPart1UploadDto;
 import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingSectionUpdateDto;
 import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingSectionUploadDto;
 import com.timcritt.tfg.infrastructure.web.dtoMapper.MaterialNodeWithAssetsDtoMapper;
@@ -40,6 +40,7 @@ public class TOEFLSpeakingController {
         this.multipartFieldValidator = multipartFieldValidator;
     }
 
+    //Only accessible to users that have been assigned the material
     @RequireMaterialReadAccess
     @GetMapping("/material/{materialId}/part/{partNumber}/question/{questionNumber}")
     public ResponseEntity<MaterialNodeWithAssetsDto> getQuestion(
@@ -52,14 +53,8 @@ public class TOEFLSpeakingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping(value = "/material/part1/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Void> uploadSpeakingPart1(@Valid @ModelAttribute TOEFLSpeakingPart1UploadDto dto, HttpServletRequest request) {
-        multipartFieldValidator.validatePart1Upload(request, dto);
 
-        commandUseCase.uploadSpeakingPart1(TOEFLSpeakingUploadCommandMapper.toPart1Command(dto));
-        return ResponseEntity.ok().build();
-    }
-
+    //Should only be available to role: content_author
     @PostMapping(value = "/material/section/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> uploadSpeakingSection(@Valid @ModelAttribute TOEFLSpeakingSectionUploadDto dto, HttpServletRequest request) {
         multipartFieldValidator.validateSectionUpload(request, dto);
@@ -68,6 +63,17 @@ public class TOEFLSpeakingController {
         return ResponseEntity.ok().build();
     }
 
+    //Should only be available to role: content_author
+    // Drafts intentionally bypass bean validation so incomplete multipart payloads can be saved.
+    @PostMapping(value = "/material/section/draft", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<DraftSaveResponseDto> saveSpeakingSectionDraft(@ModelAttribute TOEFLSpeakingSectionUploadDto dto, HttpServletRequest request) {
+        multipartFieldValidator.validateSectionUpload(request, dto);
+
+        Long materialId = commandUseCase.uploadSpeakingSection(TOEFLSpeakingUploadCommandMapper.toSectionCommand(dto));
+        return ResponseEntity.ok(new DraftSaveResponseDto(materialId));
+    }
+
+    //Should only be available to role: content_author
     @PatchMapping(value = "/material/{materialId}/section", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> updateSpeakingSection(
             @PathVariable Long materialId,
@@ -80,6 +86,7 @@ public class TOEFLSpeakingController {
     }
 
 
+    //Should only be available to roles: admin, content_author
     @GetMapping("/material/{materialId}/section")
     public ResponseEntity<SpeakingSectionEditDto> getSpeakingSectionForEdit(@MaterialId @PathVariable Long materialId) {
         return navigationUseCase.getSpeakingSectionForEdit(materialId)
@@ -88,6 +95,7 @@ public class TOEFLSpeakingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    //Should only be accessible to roles: admin, content_author
     @GetMapping("/sections-summaries")
     public ResponseEntity<List<SpeakingSectionSummaryDto>> getAllSpeakingSectionSummaries() {
         List<SpeakingSectionSummaryDto> sections = navigationUseCase.getAllSpeakingSectionSummaries()
@@ -95,5 +103,23 @@ public class TOEFLSpeakingController {
                 .map(SpeakingSectionSummaryDtoMapper::toDto)
                 .toList();
         return ResponseEntity.ok(sections);
+    }
+
+    //Should only be accessible to roles: admin, content_author
+    @GetMapping("/sections-summaries/drafts")
+    public ResponseEntity<List<SpeakingSectionSummaryDto>> getDraftSpeakingSectionSummaries() {
+        List<SpeakingSectionSummaryDto> sections = navigationUseCase.getDraftSpeakingSectionSummaries()
+                .stream()
+                .map(SpeakingSectionSummaryDtoMapper::toDto)
+                .toList();
+        return ResponseEntity.ok(sections);
+    }
+
+    // Should only be available to role: content_author
+    // Validates completeness then flips status from DRAFT → PUBLISHED.
+    @PatchMapping("/material/{materialId}/publish")
+    public ResponseEntity<Void> publishSpeakingSection(@PathVariable Long materialId) {
+        commandUseCase.publishSpeakingSection(materialId);
+        return ResponseEntity.ok().build();
     }
 }

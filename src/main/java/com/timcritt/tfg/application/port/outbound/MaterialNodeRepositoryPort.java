@@ -10,10 +10,7 @@ public interface MaterialNodeRepositoryPort {
     List<MaterialNode> findAll();
     void deleteById(Long id);
     List<MaterialNode> findByParentNodeId(Long parentNodeId);
-
-    List<MaterialNode> findAllDescendantsByRootId(Long sectionId);
     List<MaterialNode> findByKind(String kind);
     List<MaterialNode> findByKindAndExamFamilyIdAndSkillId(String kind, Long examFamilyId, Long skillId);
     Optional<MaterialNode> findByParentIdAndDisplayOrder(Long parentId, Integer displayOrder);
-    List<MaterialNode> findByParentId(Long parentId);
 }

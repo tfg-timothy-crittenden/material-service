@@ -19,21 +19,5 @@ public class TaskTypeEntityMapper {
         taskType.setUpdatedAt(entity.getUpdatedAt());
         return taskType;
     }
-
-    public static TaskTypeJpaEntity toEntity(TaskType domain) {
-        if (domain == null) return null;
-        return TaskTypeJpaEntity.builder()
-                .id(domain.getId())
-                .code(domain.getCode())
-                .name(domain.getName())
-                .examFamilyId(domain.getExamFamilyId())
-                .skillId(domain.getSkillId())
-                .description(domain.getDescription())
-                .configSchema(domain.getConfigSchema())
-                .version(domain.getVersion())
-                .createdAt(domain.getCreatedAt())
-                .updatedAt(domain.getUpdatedAt())
-                .build();
-    }
 }
 

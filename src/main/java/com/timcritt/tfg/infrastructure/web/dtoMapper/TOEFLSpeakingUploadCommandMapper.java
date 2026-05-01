@@ -4,11 +4,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateCommand;
-import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingPart1UploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
-import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingPart1UploadDto;
 import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingSectionUploadDto;
 import com.timcritt.tfg.infrastructure.web.dto.TOEFLSpeakingSectionUpdateDto;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,20 +20,6 @@ public final class TOEFLSpeakingUploadCommandMapper {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private TOEFLSpeakingUploadCommandMapper() {
-    }
-
-    public static TOEFLSpeakingPart1UploadCommand toPart1Command(TOEFLSpeakingPart1UploadDto dto) {
-        if (dto == null) {
-            return null;
-        }
-        return TOEFLSpeakingPart1UploadCommand.builder()
-                .materialTitle(dto.getMaterialTitle())
-                .materialDescription(dto.getMaterialDescription())
-                .materialId(dto.getMaterialId())
-                .partTitle(dto.getPartTitle())
-                .partImage(toUploadedFile(dto.getPartImage(), "partImage"))
-                .questions(toPart1Questions(dto.getQuestions(), "questions"))
-                .build();
     }
 
     public static TOEFLSpeakingSectionUploadCommand toSectionCommand(TOEFLSpeakingSectionUploadDto dto) {
@@ -54,20 +38,6 @@ public final class TOEFLSpeakingUploadCommandMapper {
                 .build();
     }
 
-    private static List<SpeakingQuestionUploadCommand> toPart1Questions(
-            List<TOEFLSpeakingPart1UploadDto.QuestionUpload> questions,
-            String fieldName) {
-        if (questions == null) {
-            return null;
-        }
-        return questions.stream()
-                .map(q -> SpeakingQuestionUploadCommand.builder()
-                        .transcriptText(q.getTranscriptText())
-                        .config(parseConfig(q.getConfig(), fieldName))
-                        .audio(toUploadedFile(q.getAudio(), fieldName + ".audio"))
-                        .build())
-                .toList();
-    }
 
     private static List<SpeakingQuestionUploadCommand> toSectionQuestions(
             List<TOEFLSpeakingSectionUploadDto.QuestionUpload> questions,

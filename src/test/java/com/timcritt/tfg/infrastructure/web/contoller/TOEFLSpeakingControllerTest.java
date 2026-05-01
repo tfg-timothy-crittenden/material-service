@@ -1,0 +1,70 @@
+package com.timcritt.tfg.infrastructure.web.contoller;
+
+import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
+import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
+import com.timcritt.tfg.infrastructure.web.validation.SpeakingMultipartFieldValidator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class TOEFLSpeakingControllerTest {
+
+    private final TOEFLSpeakingNavigationUseCase navigationUseCase = mock(TOEFLSpeakingNavigationUseCase.class);
+    private final TOEFLSpeakingMaterialCommandUseCase commandUseCase = mock(TOEFLSpeakingMaterialCommandUseCase.class);
+    private final SpeakingMultipartFieldValidator multipartFieldValidator = new SpeakingMultipartFieldValidator();
+
+    private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        TOEFLSpeakingController controller = new TOEFLSpeakingController(
+                navigationUseCase,
+                commandUseCase,
+                multipartFieldValidator
+        );
+
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
+
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setValidator(validator)
+                .build();
+    }
+
+    @Test
+    void saveSpeakingSectionDraft_allowsIncompleteMultipartPayload() throws Exception {
+        when(commandUseCase.uploadSpeakingSection(any())).thenReturn(123L);
+
+        mockMvc.perform(multipart("/api/toefl-speaking/material/section/draft")
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .param("materialDescription", "Draft in progress"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.materialId").value(123));
+
+        verify(commandUseCase, times(1)).uploadSpeakingSection(any());
+    }
+
+    @Test
+    void uploadSpeakingSection_rejectsIncompleteMultipartPayload() throws Exception {
+        mockMvc.perform(multipart("/api/toefl-speaking/material/section/upload")
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .param("materialDescription", "Draft in progress"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(commandUseCase);
+    }
+}
+

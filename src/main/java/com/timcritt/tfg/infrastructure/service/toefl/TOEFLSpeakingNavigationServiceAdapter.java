@@ -46,5 +46,11 @@ public class TOEFLSpeakingNavigationServiceAdapter implements TOEFLSpeakingNavig
     public List<SpeakingSectionSummary> getAllSpeakingSectionSummaries() {
         return delegate.getAllSpeakingSectionSummaries();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SpeakingSectionSummary> getDraftSpeakingSectionSummaries() {
+        return delegate.getDraftSpeakingSectionSummaries();
+    }
 }
 

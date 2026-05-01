@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/storage")
 public class StorageController {
+    private static final long DEFAULT_EXPIRATION_SECONDS = 3600L;
+
     private final StorageRepositoryPort storageRepositoryPort;
 
     @Autowired
@@ -21,9 +23,8 @@ public class StorageController {
     @GetMapping("/presigned-url")
     public ResponseEntity<String> generatePresignedUrl(
             @RequestParam String bucket,
-            @RequestParam String objectKey,
-            @RequestParam(defaultValue = "3600") long expirationSeconds) {
-        String url = storageRepositoryPort.generatePresignedUrl(bucket, objectKey, expirationSeconds);
+            @RequestParam String objectKey) {
+        String url = storageRepositoryPort.generatePresignedUrl(bucket, objectKey, DEFAULT_EXPIRATION_SECONDS);
         return ResponseEntity.ok(url);
     }
 }

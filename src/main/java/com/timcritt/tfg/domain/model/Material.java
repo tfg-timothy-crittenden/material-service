@@ -17,6 +17,7 @@ public class Material {
     private String description;
     private Long authorId;
     private Long ownerOrgId;
+    private MaterialStatus status;
     private Long version;
     private Instant createdAt;
     private Instant updatedAt;
