@@ -2,6 +2,7 @@ package com.timcritt.tfg.architecture;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,9 @@ class ArchitectureTest {
 
     @Test
     void hexagonal_architecture_should_be_followed() {
-        JavaClasses classes = new ClassFileImporter().importPackages(BASE);
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages(BASE);
 
         ArchRule domainMustBeIndependent = ArchRuleDefinition.noClasses()
                 .that().resideInAPackage(DOMAIN)
