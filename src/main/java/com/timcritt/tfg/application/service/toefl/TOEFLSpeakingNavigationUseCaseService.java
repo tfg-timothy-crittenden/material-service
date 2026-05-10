@@ -70,6 +70,7 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
         return Optional.of(SpeakingSectionEditResult.builder()
                 .materialId(material.getId())
                 .sectionId(rootNode.getId())
+                .status(material.getStatus())
                 .materialTitle(material.getTitle())
                 .materialDescription(material.getDescription())
                 .partTitle(part1Opt.map(MaterialNode::getTitle).orElse(null))

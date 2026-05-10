@@ -1,5 +1,6 @@
 package com.timcritt.tfg.application.dto;
 
+import com.timcritt.tfg.domain.model.MaterialStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,6 +15,7 @@ import java.util.List;
 public class SpeakingSectionEditResult {
     private Long materialId;
     private Long sectionId;
+    private MaterialStatus status;
     private String materialTitle;
     private String materialDescription;
 

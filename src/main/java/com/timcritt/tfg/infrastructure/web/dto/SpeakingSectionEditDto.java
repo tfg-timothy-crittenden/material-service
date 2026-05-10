@@ -1,5 +1,6 @@
 package com.timcritt.tfg.infrastructure.web.dto;
 
+import com.timcritt.tfg.domain.model.MaterialStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,6 +16,7 @@ import java.util.Map;
 public class SpeakingSectionEditDto {
     private Long materialId;
     private Long sectionId;
+    private MaterialStatus status;
     private String materialTitle;
     private String materialDescription;
 

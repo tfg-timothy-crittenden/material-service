@@ -1,7 +1,9 @@
 package com.timcritt.tfg.infrastructure.web.contoller;
 
+import com.timcritt.tfg.application.dto.SpeakingSectionEditResult;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
+import com.timcritt.tfg.domain.model.MaterialStatus;
 import com.timcritt.tfg.infrastructure.web.validation.SpeakingMultipartFieldValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,12 +12,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.util.Optional;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -74,6 +79,22 @@ class TOEFLSpeakingControllerTest {
                 .andExpect(status().isOk());
 
         verify(commandUseCase, times(1)).deleteSpeakingSection(123L);
+    }
+
+    @Test
+    void getSpeakingSectionForEdit_returnsStatus() throws Exception {
+        when(navigationUseCase.getSpeakingSectionForEdit(55L)).thenReturn(Optional.of(
+                SpeakingSectionEditResult.builder()
+                        .materialId(55L)
+                        .sectionId(550L)
+                        .status(MaterialStatus.DRAFT)
+                        .materialTitle("Draft section")
+                        .build()
+        ));
+
+        mockMvc.perform(get("/api/toefl-speaking/material/{materialId}/section", 55L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"));
     }
 }
 

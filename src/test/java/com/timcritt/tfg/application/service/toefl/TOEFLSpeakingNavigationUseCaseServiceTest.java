@@ -161,5 +161,34 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
                         updatedAt
                 );
     }
+
+    @Test
+    void getSpeakingSectionForEdit_includesMaterialStatus() {
+        Long materialId = 55L;
+        Long sectionId = 500L;
+        Long part1Id = 501L;
+
+        Material material = Material.builder()
+                .id(materialId)
+                .materialNodeId(sectionId)
+                .title("Draft Material")
+                .description("desc")
+                .status(MaterialStatus.DRAFT)
+                .build();
+        MaterialNode section = MaterialNode.builder().id(sectionId).kind("SECTION").title("Draft Material").build();
+        MaterialNode part1 = MaterialNode.builder().id(part1Id).parentNodeId(sectionId).displayOrder(0).title("Part 1").build();
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialNodeRepository.findById(sectionId)).thenReturn(Optional.of(section));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(sectionId, 0)).thenReturn(Optional.of(part1));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(sectionId, 1)).thenReturn(Optional.empty());
+        when(materialNodeRepository.findByParentNodeId(part1Id)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(part1Id)).thenReturn(List.of());
+
+        var result = service.getSpeakingSectionForEdit(materialId);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getStatus()).isEqualTo(MaterialStatus.DRAFT);
+    }
 }
 

@@ -5,9 +5,11 @@ import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateComma
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
-import com.timcritt.tfg.application.dto.toefl.MaterialDeletedEvent;
+import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
+import com.timcritt.tfg.domain.event.MaterialTitlesUpdatedEvent;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
 import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
+import com.timcritt.tfg.application.port.outbound.MaterialTitlesUpdatedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
@@ -26,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMaterialCommandUseCase {
@@ -39,18 +42,21 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     private final MaterialAssetRepositoryPort materialAssetRepository;
     private final StorageRepositoryPort storageRepositoryPort;
     private final MaterialDeletionEventPublisherPort deletionEventPublisher;
+    private final MaterialTitlesUpdatedEventPublisherPort titlesUpdatedEventPublisher;
 
     public TOEFLSpeakingMaterialCommandService(
             MaterialRepositoryPort materialRepository,
             MaterialNodeRepositoryPort materialNodeRepository,
             MaterialAssetRepositoryPort materialAssetRepository,
             StorageRepositoryPort storageRepositoryPort,
-            MaterialDeletionEventPublisherPort deletionEventPublisher) {
+            MaterialDeletionEventPublisherPort deletionEventPublisher,
+            MaterialTitlesUpdatedEventPublisherPort titlesUpdatedEventPublisher) {
         this.materialRepository = materialRepository;
         this.materialNodeRepository = materialNodeRepository;
         this.materialAssetRepository = materialAssetRepository;
         this.storageRepositoryPort = storageRepositoryPort;
         this.deletionEventPublisher = deletionEventPublisher;
+        this.titlesUpdatedEventPublisher = titlesUpdatedEventPublisher;
     }
 
     @Override
@@ -409,6 +415,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         List<String> uploadedKeys = new ArrayList<>();
         Set<String> storageKeysBeforeUpdate = Set.of();
         Set<String> storageKeysAfterUpdate = Set.of();
+        String changedMaterialTitle = null;
+        String changedPart1Title = null;
+        String changedPart2Title = null;
 
         try {
             // ── Load material and root section node ──────────────────────────────
@@ -420,9 +429,10 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
             // ── Update material text fields ──────────────────────────────────────
             boolean materialDirty = false;
-            if (hasText(command.getMaterialTitle())) {
+            if (hasText(command.getMaterialTitle()) && !Objects.equals(material.getTitle(), command.getMaterialTitle())) {
                 material.setTitle(command.getMaterialTitle());
                 rootNode.setTitle(command.getMaterialTitle());
+                changedMaterialTitle = command.getMaterialTitle();
                 materialDirty = true;
             }
             if (command.getMaterialDescription() != null) {
@@ -443,8 +453,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             MaterialNode part1 = materialNodeRepository.findByParentIdAndDisplayOrder(rootNode.getId(), 0)
                     .orElseThrow(() -> new IllegalArgumentException("Part 1 node not found for section: " + command.getMaterialId()));
 
-            if (hasText(command.getPartTitle())) {
+            if (hasText(command.getPartTitle()) && !Objects.equals(part1.getTitle(), command.getPartTitle())) {
                 part1.setTitle(command.getPartTitle());
+                changedPart1Title = command.getPartTitle();
                 part1.setUpdatedAt(Instant.now());
                 part1.setVersion(part1.getVersion() + 1);
                 materialNodeRepository.save(part1);
@@ -478,8 +489,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                                 "Part 2 node not found for section: " + command.getMaterialId()
                                 + ". Cannot update a part that does not exist."));
 
-                if (hasText(command.getPart2Title())) {
+                if (hasText(command.getPart2Title()) && !Objects.equals(part2.getTitle(), command.getPart2Title())) {
                     part2.setTitle(command.getPart2Title());
+                    changedPart2Title = command.getPart2Title();
                     part2.setUpdatedAt(Instant.now());
                     part2.setVersion(part2.getVersion() + 1);
                     materialNodeRepository.save(part2);
@@ -516,6 +528,16 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             } catch (Exception ex) {
                 // Intentionally swallowed – do NOT roll back the DB transaction over a stale object.
             }
+        }
+
+        if (changedMaterialTitle != null || changedPart1Title != null || changedPart2Title != null) {
+            titlesUpdatedEventPublisher.publishMaterialTitlesUpdated(MaterialTitlesUpdatedEvent.builder()
+                    .materialId(command.getMaterialId())
+                    .materialTitle(changedMaterialTitle)
+                    .part1Title(changedPart1Title)
+                    .part2Title(changedPart2Title)
+                    .updatedAt(Instant.now())
+                    .build());
         }
     }
 

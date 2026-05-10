@@ -14,6 +14,7 @@ public final class SpeakingSectionEditDtoMapper {
         return SpeakingSectionEditDto.builder()
                 .materialId(source.getMaterialId())
                 .sectionId(source.getSectionId())
+                .status(source.getStatus())
                 .materialTitle(source.getMaterialTitle())
                 .materialDescription(source.getMaterialDescription())
                 .partTitle(source.getPartTitle())

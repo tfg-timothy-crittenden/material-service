@@ -1,7 +1,8 @@
 package com.timcritt.tfg.application.service.toefl;
 
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionUploadCommand;
-import com.timcritt.tfg.application.dto.toefl.MaterialDeletedEvent;
+import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
+import com.timcritt.tfg.domain.event.MaterialTitlesUpdatedEvent;
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
@@ -10,6 +11,7 @@ import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
+import com.timcritt.tfg.application.port.outbound.MaterialTitlesUpdatedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.Material;
@@ -23,9 +25,11 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,21 +41,26 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     private final MaterialAssetRepositoryPort materialAssetRepository = mock(MaterialAssetRepositoryPort.class);
     private final StorageRepositoryPort storageRepositoryPort = mock(StorageRepositoryPort.class);
     private final MaterialDeletionEventPublisherPort deletionEventPublisher = mock(MaterialDeletionEventPublisherPort.class);
+    private final MaterialTitlesUpdatedEventPublisherPort titlesUpdatedEventPublisher = mock(MaterialTitlesUpdatedEventPublisherPort.class);
 
     private final TOEFLSpeakingMaterialCommandService service = new TOEFLSpeakingMaterialCommandService(
             materialRepository,
             materialNodeRepository,
             materialAssetRepository,
             storageRepositoryPort,
-            deletionEventPublisher
+            deletionEventPublisher,
+            titlesUpdatedEventPublisher
     );
 
     @Test
     void uploadSpeakingSection_scaffoldsMissingDraftQuestionNodesForBothParts() {
+        
+        
         AtomicLong nodeIds = new AtomicLong(100L);
         AtomicLong materialIds = new AtomicLong(1000L);
         List<MaterialNode> savedNodes = new ArrayList<>();
 
+        // AtomicLong gives the lambda a mutable id counter (local variables captured by lambdas must be effectively final).
         when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> {
             MaterialNode node = invocation.getArgument(0);
             if (node.getId() == null) {
@@ -339,6 +348,80 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         verify(materialAssetRepository, times(1)).deleteById(6000L);
         verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/part1/audio/remove-me.mp3");
+    }
+
+    @Test
+    void updateSpeakingSection_titlesChanged_publishesSingleCompactTitlesEvent() {
+        Long materialId = 901L;
+        Long rootNodeId = 910L;
+        Long part1NodeId = 911L;
+        Long part2NodeId = 912L;
+
+        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).title("Old Material").version(1L).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Old Material").version(1L).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Old Part 1").version(1L).build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).parentNodeId(rootNodeId).displayOrder(1).title("Old Part 2").version(1L).build();
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
+        when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1, part2));
+        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
+        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(part2NodeId)).thenReturn(List.of());
+
+        TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .materialTitle("New Material")
+                .partTitle("New Part 1")
+                .part2Title("New Part 2")
+                .build();
+
+        service.updateSpeakingSection(command);
+
+        var eventCaptor = forClass(MaterialTitlesUpdatedEvent.class);
+        verify(titlesUpdatedEventPublisher, times(1)).publishMaterialTitlesUpdated(eventCaptor.capture());
+        MaterialTitlesUpdatedEvent event = eventCaptor.getValue();
+        assertThat(event.getMaterialId()).isEqualTo(materialId);
+        assertThat(event.getMaterialTitle()).isEqualTo("New Material");
+        assertThat(event.getPart1Title()).isEqualTo("New Part 1");
+        assertThat(event.getPart2Title()).isEqualTo("New Part 2");
+        assertThat(event.getUpdatedAt()).isNotNull();
+    }
+
+    @Test
+    void updateSpeakingSection_onlyDescriptionChanged_doesNotPublishTitlesEvent() {
+        Long materialId = 902L;
+        Long rootNodeId = 920L;
+        Long part1NodeId = 921L;
+
+        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).title("Material").version(1L).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Material").version(1L).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Part 1").version(1L).build();
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
+        when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1));
+        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
+
+        TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .materialDescription("Only description update")
+                .build();
+
+        service.updateSpeakingSection(command);
+
+        verify(titlesUpdatedEventPublisher, never()).publishMaterialTitlesUpdated(any(MaterialTitlesUpdatedEvent.class));
     }
 }
 

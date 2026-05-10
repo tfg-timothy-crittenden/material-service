@@ -1,4 +1,4 @@
-package com.timcritt.tfg.application.dto.toefl;
+package com.timcritt.tfg.domain.event;
 
 import lombok.Builder;
 import lombok.Data;

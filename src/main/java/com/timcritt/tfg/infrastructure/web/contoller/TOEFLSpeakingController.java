@@ -124,7 +124,8 @@ public class TOEFLSpeakingController {
         commandUseCase.publishSpeakingSection(materialId);
         return ResponseEntity.ok().build();
     }
-    
+
+
     @DeleteMapping("/material/{materialId}")
     public ResponseEntity<Void> deleteSpeakingSection(@PathVariable Long materialId) {
         commandUseCase.deleteSpeakingSection(materialId);
