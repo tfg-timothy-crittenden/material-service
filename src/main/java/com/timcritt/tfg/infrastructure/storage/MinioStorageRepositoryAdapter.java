@@ -1,6 +1,8 @@
 package com.timcritt.tfg.infrastructure.storage;
 
 import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
+import io.minio.BucketExistsArgs;
+import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
@@ -67,6 +69,7 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
     @Override
     public void uploadObject(String bucket, String objectKey, InputStream inputStream) {
         try {
+            ensureBucketExists(bucket);
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(bucket)
@@ -76,6 +79,25 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload object", e);
+        }
+    }
+
+    private void ensureBucketExists(String bucket) {
+        try {
+            boolean exists = minioClient.bucketExists(
+                    BucketExistsArgs.builder()
+                            .bucket(bucket)
+                            .build()
+            );
+            if (!exists) {
+                minioClient.makeBucket(
+                        MakeBucketArgs.builder()
+                                .bucket(bucket)
+                                .build()
+                );
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to ensure bucket exists: " + bucket, e);
         }
     }
 

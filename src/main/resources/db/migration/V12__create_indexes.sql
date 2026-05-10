@@ -21,11 +21,11 @@ CREATE INDEX IF NOT EXISTS idx_material_node_task_type
     ON material_node (task_type_id);
 
 CREATE INDEX IF NOT EXISTS idx_material_node_config_gin
-    ON material_node USING GIN (config);
+    ON material_node USING GIN ((config::jsonb));
 
 CREATE INDEX IF NOT EXISTS idx_material_asset_material_node
     ON material_asset (material_node_id);
 
 CREATE INDEX IF NOT EXISTS idx_material_asset_metadata_gin
-    ON material_asset USING GIN (metadata);
+    ON material_asset USING GIN ((metadata::jsonb));
 

@@ -82,7 +82,7 @@ public class MaterialNodeJpaEntity {
     private Double passingScore;
 
     @Convert(converter = MapToJsonConverter.class)
-    @Column(name = "config", columnDefinition = "json", nullable = false)
+    @Column(name = "config", columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> config;
 
     @Column(name = "version", nullable = false)

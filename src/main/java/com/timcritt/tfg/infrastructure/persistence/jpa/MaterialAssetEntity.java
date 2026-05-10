@@ -51,7 +51,7 @@ public class MaterialAssetEntity {
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
 
-    @Column(columnDefinition = "json", nullable = false)
+    @Column(columnDefinition = "jsonb", nullable = false)
     @Convert(converter = JsonbConverter.class)
     private Map<String, Object> metadata;
 
