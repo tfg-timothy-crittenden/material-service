@@ -1,39 +1,51 @@
-name: Build
+name: CI
 
 on:
   push:
     branches:
       - main
-
+  pull_request:
 
 jobs:
   build:
-    name: Build and analyze
+    name: Build and Test
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-      - name: Set up JDK 17
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: 17
-          distribution: 'zulu' # Alternative distribution options are available.
-      - name: Cache SonarQube packages
-        uses: actions/cache@v4
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build
+        run: mvn clean verify
+
+  sonarqube:
+    name: SonarQube Cloud Scan
+    runs-on: ubuntu-latest
+    needs: build
+  
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-      - name: Cache Maven packages
-        uses: actions/cache@v4
+          fetch-depth: 0
+  
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-      - name: Build and analyze
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+  
+      - name: SonarQube Cloud Scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=tfg -Dsonar.projectName='tfg'
+        run: >
+          mvn -B verify
+          org.sonarsource.scanner.maven:sonar-maven-plugin:5.6.0.6792:sonar
