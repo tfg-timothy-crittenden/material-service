@@ -23,7 +23,7 @@ jobs:
           cache: maven
 
       - name: Build
-        run: mvn clean verify
+        run: mvn -B clean verify
 
   sonarqube:
     name: SonarQube Cloud Scan
@@ -47,7 +47,9 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
-          mvn -B verify
+          mvn -B
           org.sonarsource.scanner.maven:sonar-maven-plugin:5.6.0.6792:sonar
           -Dsonar.projectKey=toefl-speaking-service
           -Dsonar.organization=tfg-timothy-crittenden
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.verbose=true
