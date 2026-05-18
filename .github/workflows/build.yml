@@ -52,4 +52,5 @@ jobs:
           -Dsonar.projectKey=material-service
           -Dsonar.organization=tfg-timothy-crittenden
           -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.java.binaries=target/classes
           -Dsonar.verbose=true
