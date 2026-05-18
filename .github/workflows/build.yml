@@ -25,6 +25,12 @@ jobs:
       - name: Build
         run: mvn -B clean verify
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-target
+          path: target
+
   sonarqube:
     name: SonarQube Cloud Scan
     runs-on: ubuntu-latest
@@ -42,6 +48,12 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-target
+          path: target
 
       - name: SonarQube Cloud Scan
         env:
