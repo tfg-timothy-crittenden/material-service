@@ -16,7 +16,9 @@ import org.springframework.boot.test.context.SpringBootTest;
         // Disable trying to contact cloud config
           "spring.cloud.config.enabled=false",
           // Keep the smoke test fully local
-          "eureka.client.enabled=false"
+          "eureka.client.enabled=false",
+          // Disable gRPC transport so ClassroomAuthorizationGrpcConfig is not loaded
+          "authorization.classroom.transport=http"
 })
 class TfgApplicationTests {
 
