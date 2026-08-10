@@ -1,6 +1,7 @@
 package com.timcritt.tfg.infrastructure.web.dto;
 
 import com.timcritt.tfg.domain.model.MaterialStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,6 +14,10 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(requiredProperties = {
+        "materialId", "sectionId", "status", "materialTitle", "materialDescription",
+        "partTitle", "partImageStorageKey", "questions", "part2Title", "part2Questions"
+})
 public class SpeakingSectionEditDto {
     private Long materialId;
     private Long sectionId;
@@ -31,11 +36,19 @@ public class SpeakingSectionEditDto {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(requiredProperties = {"index", "questionNodeId", "transcriptText", "config", "audioStorageKey"})
     public static class QuestionEditDto {
         private Integer index;
         private Long questionNodeId;
         private String transcriptText;
+
+        @Schema(
+                description = "Parsed JSON object returned by the backend for question configuration.",
+                additionalProperties = Schema.AdditionalPropertiesValue.TRUE,
+                example = "{\"prepTimeSeconds\":15,\"timeLimitSeconds\":45}"
+        )
         private Map<String, Object> config;
+
         private String audioStorageKey;
     }
 }

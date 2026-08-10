@@ -11,8 +11,12 @@ import org.springframework.boot.test.context.SpringBootTest;
         "spring.datasource.password=",
         // Disable Flyway during the lightweight context load test
         "spring.flyway.enabled=false",
+          // No schema creation is needed for this smoke test
+          "spring.jpa.hibernate.ddl-auto=none",
         // Disable trying to contact cloud config
-        "spring.cloud.config.enabled=false"
+          "spring.cloud.config.enabled=false",
+          // Keep the smoke test fully local
+          "eureka.client.enabled=false"
 })
 class TfgApplicationTests {
 

@@ -75,12 +75,12 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
         // Always create Part 1 and Part 2 to scaffold the full tree structure.
         MaterialNode part1Node = createPartNode(savedRootNode.getId(), command.getPartTitle(), 0);
-        saveImageAsset(command.getPartImage(), part1Node.getId(), "speaking/part1/image");
-        createQuestions(part1Node.getId(), command.getQuestions(), "speaking/part1/audio");
+        saveImageAsset(command.getPartImage(), savedMaterial.getId(), part1Node.getId(), 1);
+        createQuestions(savedMaterial.getId(), part1Node.getId(), command.getQuestions(), 1);
         createMissingPlaceholderQuestions(part1Node.getId(), safeSize(command.getQuestions()), PART_1_QUESTION_COUNT);
 
         MaterialNode part2Node = createPartNode(savedRootNode.getId(), command.getPart2Title(), 1);
-        createQuestions(part2Node.getId(), command.getPart2Questions(), "speaking/part2/audio");
+        createQuestions(savedMaterial.getId(), part2Node.getId(), command.getPart2Questions(), 2);
         createMissingPlaceholderQuestions(part2Node.getId(), safeSize(command.getPart2Questions()), PART_2_QUESTION_COUNT);
 
         return savedMaterial.getId();
@@ -282,26 +282,28 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         return materialNodeRepository.save(partNode);
     }
 
-    private void saveImageAsset(UploadedFileCommand image, Long materialNodeId, String keyPrefix) {
-        saveAsset(image, materialNodeId, MaterialAsset.Kind.IMAGE, keyPrefix);
+    private void saveImageAsset(UploadedFileCommand image, Long materialId, Long materialNodeId, int partNumber) {
+        saveAsset(image, materialNodeId, MaterialAsset.Kind.IMAGE,
+                buildSpeakingStorageKey(materialId, partNumber, MaterialAsset.Kind.IMAGE, null));
     }
 
-    private void saveAudioAsset(UploadedFileCommand audio, Long materialNodeId, String keyPrefix) {
-        saveAsset(audio, materialNodeId, MaterialAsset.Kind.AUDIO, keyPrefix);
+    private void saveAudioAsset(UploadedFileCommand audio, Long materialId, Long materialNodeId, int partNumber, int questionNumber) {
+        saveAsset(audio, materialNodeId, MaterialAsset.Kind.AUDIO,
+                buildSpeakingStorageKey(materialId, partNumber, MaterialAsset.Kind.AUDIO, questionNumber));
     }
 
-    private void saveAsset(UploadedFileCommand file, Long materialNodeId, MaterialAsset.Kind kind, String keyPrefix) {
+    private void saveAsset(UploadedFileCommand file, Long materialNodeId, MaterialAsset.Kind kind, String storageKey) {
         if (file == null || file.getBytes() == null || file.getBytes().length == 0) {
             return;
         }
 
-        String originalFilename = hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "file";
-        String storageKey = keyPrefix + "/" + System.currentTimeMillis() + "_" + originalFilename;
         try {
             storageRepositoryPort.uploadObject("toefl", storageKey, new ByteArrayInputStream(file.getBytes()));
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload file to storage", e);
         }
+
+        String originalFilename = hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "file";
 
         MaterialAsset asset = new MaterialAsset();
         asset.setMaterialNodeId(materialNodeId);
@@ -319,7 +321,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         materialAssetRepository.save(asset);
     }
 
-    private void createQuestions(Long partNodeId, List<SpeakingQuestionUploadCommand> questions, String audioPrefix) {
+    private void createQuestions(Long materialId, Long partNodeId, List<SpeakingQuestionUploadCommand> questions, int partNumber) {
         Instant now = Instant.now();
         List<SpeakingQuestionUploadCommand> safeQuestions = questions == null ? Collections.emptyList() : new ArrayList<>(questions);
 
@@ -344,7 +346,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                     .updatedAt(now)
                     .build();
             MaterialNode savedQuestionNode = materialNodeRepository.save(questionNode);
-            saveAudioAsset(question.getAudio(), savedQuestionNode.getId(), audioPrefix);
+            saveAudioAsset(question.getAudio(), materialId, savedQuestionNode.getId(), partNumber, questionOrder + 1);
             questionOrder++;
         }
     }
@@ -465,8 +467,8 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 if (Boolean.TRUE.equals(command.getRemovePartImage())) {
                     throw new IllegalArgumentException("partImage and removePartImage cannot both be set");
                 }
-                replaceAsset(command.getPartImage(), part1.getId(),
-                        MaterialAsset.Kind.IMAGE, "part1/image", uploadedKeys);
+                replaceAsset(command.getPartImage(), command.getMaterialId(), part1.getId(),
+                        MaterialAsset.Kind.IMAGE, 1, null, uploadedKeys);
             } else if (Boolean.TRUE.equals(command.getRemovePartImage())) {
                 deleteAsset(part1.getId(), MaterialAsset.Kind.IMAGE);
             }
@@ -474,7 +476,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             if (command.getQuestions() != null) {
                 for (SpeakingQuestionPartialUpdateCommand q : command.getQuestions()) {
                     if (isEmptyQuestionUpdate(q)) continue;
-                    updateQuestionNode(q, part1.getId(), "part1/audio", uploadedKeys);
+                    updateQuestionNode(q, command.getMaterialId(), part1.getId(), 1, uploadedKeys);
                 }
             }
 
@@ -500,7 +502,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 if (command.getPart2Questions() != null) {
                     for (SpeakingQuestionPartialUpdateCommand q : command.getPart2Questions()) {
                         if (isEmptyQuestionUpdate(q)) continue;
-                        updateQuestionNode(q, part2.getId(), "part2/audio", uploadedKeys);
+                        updateQuestionNode(q, command.getMaterialId(), part2.getId(), 2, uploadedKeys);
                     }
                 }
             }
@@ -509,7 +511,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
         } catch (Exception e) {
             // Compensation: delete any files that were successfully uploaded before the failure.
-            for (String key : uploadedKeys) {
+            Set<String> keysToDeleteOnFailure = new HashSet<>(uploadedKeys);
+            keysToDeleteOnFailure.removeAll(storageKeysBeforeUpdate);
+            for (String key : keysToDeleteOnFailure) {
                 try {
                     storageRepositoryPort.deleteObject("toefl", key);
                 } catch (Exception ex) {
@@ -547,8 +551,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
      */
     private void updateQuestionNode(
             SpeakingQuestionPartialUpdateCommand q,
+            Long materialId,
             Long partNodeId,
-            String audioPrefix,
+            int partNumber,
             List<String> uploadedKeys) {
 
         MaterialNode questionNode = materialNodeRepository.findByParentIdAndDisplayOrder(partNodeId, q.getIndex())
@@ -574,8 +579,8 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             if (Boolean.TRUE.equals(q.getRemoveAudio())) {
                 throw new IllegalArgumentException("audio and removeAudio cannot both be set for question index " + q.getIndex());
             }
-            replaceAsset(q.getAudio(), questionNode.getId(),
-                    MaterialAsset.Kind.AUDIO, audioPrefix, uploadedKeys);
+            replaceAsset(q.getAudio(), materialId, questionNode.getId(),
+                    MaterialAsset.Kind.AUDIO, partNumber, questionNode.getDisplayOrder() + 1, uploadedKeys);
         } else if (Boolean.TRUE.equals(q.getRemoveAudio())) {
             deleteAsset(questionNode.getId(), MaterialAsset.Kind.AUDIO);
         }
@@ -587,13 +592,15 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
      */
     private void replaceAsset(
             UploadedFileCommand file,
+            Long materialId,
             Long materialNodeId,
             MaterialAsset.Kind kind,
-            String keyPrefix,
+            int partNumber,
+            Integer questionNumber,
             List<String> uploadedKeys) {
 
         String originalFilename = hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "file";
-        String newKey = keyPrefix + "/" + System.currentTimeMillis() + "_" + originalFilename;
+        String newKey = buildSpeakingStorageKey(materialId, partNumber, kind, questionNumber);
         storageRepositoryPort.uploadObject("toefl", newKey, new ByteArrayInputStream(file.getBytes()));
         uploadedKeys.add(newKey);
 
@@ -626,6 +633,23 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             asset.setUpdatedAt(now);
         }
         materialAssetRepository.save(asset);
+    }
+
+    private String buildSpeakingStorageKey(Long materialId, int partNumber, MaterialAsset.Kind kind, Integer questionNumber) {
+        if (materialId == null) {
+            throw new IllegalArgumentException("materialId is required for speaking storage keys");
+        }
+        String basePath = "speaking/" + materialId + "/part" + partNumber;
+        if (kind == MaterialAsset.Kind.IMAGE) {
+            return basePath + "/image/image.png";
+        }
+        if (kind == MaterialAsset.Kind.AUDIO) {
+            if (questionNumber == null) {
+                throw new IllegalArgumentException("questionNumber is required for speaking audio keys");
+            }
+            return basePath + "/audio/question_" + questionNumber + ".mp3";
+        }
+        throw new IllegalArgumentException("Unsupported speaking asset kind: " + kind);
     }
 
     private Set<String> collectStorageKeysForSubtree(Long rootNodeId) {
