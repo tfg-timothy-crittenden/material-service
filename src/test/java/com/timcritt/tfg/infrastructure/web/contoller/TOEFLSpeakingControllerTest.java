@@ -21,6 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -79,6 +80,14 @@ class TOEFLSpeakingControllerTest {
                 .andExpect(status().isOk());
 
         verify(commandUseCase, times(1)).deleteSpeakingSection(123L);
+    }
+
+    @Test
+    void publishSpeakingSection_returnsOkAndDelegatesToUseCase() throws Exception {
+        mockMvc.perform(patch("/api/toefl-speaking/material/{materialId}/publish", 123L))
+                .andExpect(status().isOk());
+
+        verify(commandUseCase, times(1)).publishSpeakingSection(123L);
     }
 
     @Test

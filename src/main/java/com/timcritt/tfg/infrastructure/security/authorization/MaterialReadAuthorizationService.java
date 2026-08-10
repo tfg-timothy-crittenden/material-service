@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MaterialReadAuthorizationService {
 
-    private final ClassroomAuthorizationClient authorizationClient;
+    private final ClassroomAuthorizationPort authorizationClient;
     private final ClassroomAuthorizationProperties properties;
 
     public void assertCanRead(Long materialId) {
@@ -27,7 +27,7 @@ public class MaterialReadAuthorizationService {
 
         String userId = resolveCurrentUserId();
         try {
-            ClassroomAuthorizationClient.MaterialAccessCheckResponse response =
+            ClassroomAuthorizationPort.MaterialAccessCheckResponse response =
                     authorizationClient.checkReadAccess(userId, materialId);
             if (!response.isAllowed()) {
                 throw new AccessDeniedException("Access denied to material " + materialId);

@@ -2,6 +2,7 @@ package com.timcritt.tfg.infrastructure.security.authorization;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -10,8 +11,9 @@ import org.springframework.web.client.RestClientResponseException;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "authorization.classroom", name = "transport", havingValue = "http", matchIfMissing = true)
 @RequiredArgsConstructor
-public class ClassroomAuthorizationClient {
+public class ClassroomAuthorizationClient implements ClassroomAuthorizationPort {
 
     private final RestClient.Builder restClientBuilder;
     private final ClassroomAuthorizationProperties properties;
@@ -40,11 +42,12 @@ public class ClassroomAuthorizationClient {
             }
             return response;
         } catch (RestClientResponseException ex) {
+            String responseBody = ex.getResponseBodyAsString();
             String message = "Classroom authorization call failed: "
                     + ex.getStatusCode() + " from " + target
-                    + (ex.getResponseBodyAsString() == null || ex.getResponseBodyAsString().isBlank()
+                    + (responseBody == null || responseBody.isBlank()
                     ? ""
-                    : " - " + ex.getResponseBodyAsString());
+                    : " - " + responseBody);
             throw new ClassroomAuthorizationUnavailableException(message, ex);
         } catch (RestClientException ex) {
             throw new ClassroomAuthorizationUnavailableException(
@@ -52,13 +55,5 @@ public class ClassroomAuthorizationClient {
         }
     }
 
-    public record MaterialAccessCheckRequest(String userId, Long materialId, String action) {
-    }
-
-    public record MaterialAccessCheckResponse(Boolean allowed, String reason, String effectiveRole) {
-        public boolean isAllowed() {
-            return Boolean.TRUE.equals(allowed);
-        }
-    }
 }
 

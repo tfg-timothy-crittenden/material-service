@@ -16,6 +16,7 @@ import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialNode;
+import com.timcritt.tfg.domain.model.MaterialStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -25,8 +26,10 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -96,6 +99,12 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Long materialId = service.uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand.builder()
                 .materialTitle("Draft section")
                 .partTitle("Part 1")
+                .partImage(UploadedFileCommand.builder()
+                        .originalFilename("cover.png")
+                        .contentType("image/png")
+                        .size(3L)
+                        .bytes(new byte[]{1, 2, 3})
+                        .build())
                 .questions(List.of(question("Part 1 question 1")))
                 .part2Title("Part 2")
                 .part2Questions(List.of(
@@ -105,6 +114,15 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build());
 
         assertThat(materialId).isEqualTo(1000L);
+
+        var storageKeyCaptor = forClass(String.class);
+        verify(storageRepositoryPort, times(4)).uploadObject(eq("toefl"), storageKeyCaptor.capture(), any());
+        assertThat(storageKeyCaptor.getAllValues()).containsExactly(
+                "speaking/1000/part1/image/image.png",
+                "speaking/1000/part1/audio/question_1.mp3",
+                "speaking/1000/part2/audio/question_1.mp3",
+                "speaking/1000/part2/audio/question_2.mp3"
+        );
 
         MaterialNode root = savedNodes.stream()
                 .filter(node -> "SECTION".equals(node.getKind()))
@@ -156,6 +174,12 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     private static SpeakingQuestionUploadCommand question(String transcriptText) {
         return SpeakingQuestionUploadCommand.builder()
                 .transcriptText(transcriptText)
+                .audio(UploadedFileCommand.builder()
+                        .originalFilename("question-audio.mp3")
+                        .contentType("audio/mpeg")
+                        .size(3L)
+                        .bytes(new byte[]{1, 2, 3})
+                        .build())
                 .build();
     }
 
@@ -209,7 +233,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         MaterialAsset imageAsset = new MaterialAsset();
         imageAsset.setMaterialNodeId(part1NodeId);
         imageAsset.setKind(MaterialAsset.Kind.IMAGE);
-        imageAsset.setStorageKey("speaking/part1/image_old.png");
+        imageAsset.setStorageKey("speaking/88/part1/image/old-image.png");
         imageAsset.setVersion(3L);
 
         when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
@@ -230,8 +254,10 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         service.updateSpeakingSection(command);
 
-        verify(storageRepositoryPort, times(1)).uploadObject(any(), any(), any());
-        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/part1/image_old.png");
+        var uploadKeyCaptor = forClass(String.class);
+        verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), uploadKeyCaptor.capture(), any());
+        assertThat(uploadKeyCaptor.getValue()).isEqualTo("speaking/88/part1/image/image.png");
+        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/88/part1/image/old-image.png");
     }
 
     @Test
@@ -254,7 +280,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         imageAsset.setId(5000L);
         imageAsset.setMaterialNodeId(part1NodeId);
         imageAsset.setKind(MaterialAsset.Kind.IMAGE);
-        imageAsset.setStorageKey("speaking/part1/remove-me.png");
+        imageAsset.setStorageKey("speaking/89/part1/image/old-image.png");
 
         List<MaterialAsset> part1Assets = new ArrayList<>(List.of(imageAsset));
         when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
@@ -298,7 +324,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         service.updateSpeakingSection(command);
 
         verify(materialAssetRepository, times(1)).deleteById(5000L);
-        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/part1/remove-me.png");
+        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/89/part1/image/old-image.png");
     }
 
     @Test
@@ -326,7 +352,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         audioAsset.setId(6000L);
         audioAsset.setMaterialNodeId(questionNodeId);
         audioAsset.setKind(MaterialAsset.Kind.AUDIO);
-        audioAsset.setStorageKey("speaking/part1/audio/remove-me.mp3");
+        audioAsset.setStorageKey("speaking/90/part1/audio/old-question.mp3");
 
         List<MaterialAsset> qAssets = new ArrayList<>(List.of(audioAsset));
         when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
@@ -347,7 +373,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         service.updateSpeakingSection(command);
 
         verify(materialAssetRepository, times(1)).deleteById(6000L);
-        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/part1/audio/remove-me.mp3");
+        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/90/part1/audio/old-question.mp3");
     }
 
     @Test
@@ -422,6 +448,278 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         service.updateSpeakingSection(command);
 
         verify(titlesUpdatedEventPublisher, never()).publishMaterialTitlesUpdated(any(MaterialTitlesUpdatedEvent.class));
+    }
+
+    @Test
+    void publishSpeakingSection_whenSectionIsComplete_marksMaterialAsPublished() {
+        Long materialId = 1001L;
+        Long rootNodeId = 2001L;
+        Long part1NodeId = 2002L;
+        Long part2NodeId = 2003L;
+        Long part1Question1Id = 2101L;
+        Long part1Question2Id = 2102L;
+        Long part1Question3Id = 2103L;
+        Long part1Question4Id = 2104L;
+        Long part1Question5Id = 2105L;
+        Long part1Question6Id = 2106L;
+        Long part1Question7Id = 2107L;
+        Long part2Question1Id = 2201L;
+        Long part2Question2Id = 2202L;
+        Long part2Question3Id = 2203L;
+        Long part2Question4Id = 2204L;
+
+        Material material = Material.builder()
+                .id(materialId)
+                .materialNodeId(rootNodeId)
+                .title("Complete speaking section")
+                .status(MaterialStatus.DRAFT)
+                .version(2L)
+                .build();
+
+        MaterialNode root = MaterialNode.builder()
+                .id(rootNodeId)
+                .title("Complete speaking section")
+                .build();
+
+        MaterialNode part1 = MaterialNode.builder()
+                .id(part1NodeId)
+                .parentNodeId(rootNodeId)
+                .displayOrder(0)
+                .title("Part 1")
+                .build();
+
+        MaterialNode part2 = MaterialNode.builder()
+                .id(part2NodeId)
+                .parentNodeId(rootNodeId)
+                .displayOrder(1)
+                .title("Part 2")
+                .build();
+
+        List<MaterialNode> part1Questions = List.of(
+                questionNode(part1Question1Id, part1NodeId, 0, "P1 Q1"),
+                questionNode(part1Question2Id, part1NodeId, 1, "P1 Q2"),
+                questionNode(part1Question3Id, part1NodeId, 2, "P1 Q3"),
+                questionNode(part1Question4Id, part1NodeId, 3, "P1 Q4"),
+                questionNode(part1Question5Id, part1NodeId, 4, "P1 Q5"),
+                questionNode(part1Question6Id, part1NodeId, 5, "P1 Q6"),
+                questionNode(part1Question7Id, part1NodeId, 6, "P1 Q7")
+        );
+
+        List<MaterialNode> part2Questions = List.of(
+                questionNode(part2Question1Id, part2NodeId, 0, "P2 Q1"),
+                questionNode(part2Question2Id, part2NodeId, 1, "P2 Q2"),
+                questionNode(part2Question3Id, part2NodeId, 2, "P2 Q3"),
+                questionNode(part2Question4Id, part2NodeId, 3, "P2 Q4")
+        );
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
+        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(part1Questions);
+        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(part2Questions);
+        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of(imageAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1Question1Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1Question2Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1Question3Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1Question4Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1Question5Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1Question6Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1Question7Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part2Question1Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part2Question2Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part2Question3Id)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part2Question4Id)).thenReturn(List.of(audioAsset()));
+        when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.publishSpeakingSection(materialId);
+
+        var materialCaptor = forClass(Material.class);
+        verify(materialRepository, times(1)).save(materialCaptor.capture());
+
+        Material savedMaterial = materialCaptor.getValue();
+        assertThat(savedMaterial.getStatus()).isEqualTo(MaterialStatus.PUBLISHED);
+        assertThat(savedMaterial.getVersion()).isEqualTo(3L);
+        assertThat(savedMaterial.getUpdatedAt()).isNotNull();
+    }
+
+    @Test
+    void publishSpeakingSection_whenMaterialTitleIsMissing_throwsException() {
+        Long materialId = 3001L;
+        Long rootNodeId = 3002L;
+
+        Material material = Material.builder()
+                .id(materialId)
+                .materialNodeId(rootNodeId)
+                .title(" ")
+                .status(MaterialStatus.DRAFT)
+                .version(1L)
+                .build();
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        assertThatThrownBy(() -> service.publishSpeakingSection(materialId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("material title is required");
+
+        verify(materialRepository, never()).save(any(Material.class));
+    }
+
+    @Test
+    void publishSpeakingSection_whenPart1ImageIsMissing_throwsException() {
+        Long materialId = 3003L;
+        Long rootNodeId = 3004L;
+        Long part1NodeId = 3005L;
+        Long part2NodeId = 3006L;
+        Long part1QuestionId = 3007L;
+
+        Material material = Material.builder()
+                .id(materialId)
+                .materialNodeId(rootNodeId)
+                .title("Complete speaking section")
+                .status(MaterialStatus.DRAFT)
+                .version(1L)
+                .build();
+
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Complete speaking section").build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Part 1").build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).parentNodeId(rootNodeId).displayOrder(1).title("Part 2").build();
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
+        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1")));
+        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of(
+                questionNode(3008L, part2NodeId, 0, "P2 Q1"),
+                questionNode(3009L, part2NodeId, 1, "P2 Q2"),
+                questionNode(3010L, part2NodeId, 2, "P2 Q3"),
+                questionNode(3011L, part2NodeId, 3, "P2 Q4")
+        ));
+        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(part1QuestionId)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3008L)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3009L)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3010L)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3011L)).thenReturn(List.of(audioAsset()));
+
+        assertThatThrownBy(() -> service.publishSpeakingSection(materialId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Part 1 image is required");
+
+        verify(materialRepository, never()).save(any(Material.class));
+    }
+
+    @Test
+    void publishSpeakingSection_whenPart1QuestionAudioIsMissing_throwsException() {
+        Long materialId = 3012L;
+        Long rootNodeId = 3013L;
+        Long part1NodeId = 3014L;
+        Long part2NodeId = 3015L;
+        Long part1QuestionId = 3016L;
+
+        Material material = Material.builder()
+                .id(materialId)
+                .materialNodeId(rootNodeId)
+                .title("Complete speaking section")
+                .status(MaterialStatus.DRAFT)
+                .version(1L)
+                .build();
+
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Complete speaking section").build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Part 1").build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).parentNodeId(rootNodeId).displayOrder(1).title("Part 2").build();
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
+        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1")));
+        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of(
+                questionNode(3017L, part2NodeId, 0, "P2 Q1"),
+                questionNode(3018L, part2NodeId, 1, "P2 Q2"),
+                questionNode(3019L, part2NodeId, 2, "P2 Q3"),
+                questionNode(3020L, part2NodeId, 3, "P2 Q4")
+        ));
+        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of(imageAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1QuestionId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(3017L)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3018L)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3019L)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3020L)).thenReturn(List.of(audioAsset()));
+
+        assertThatThrownBy(() -> service.publishSpeakingSection(materialId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Part 1 question 0 is missing audio");
+
+        verify(materialRepository, never()).save(any(Material.class));
+    }
+
+    @Test
+    void publishSpeakingSection_whenPart2QuestionCountIsInvalid_throwsException() {
+        Long materialId = 3021L;
+        Long rootNodeId = 3022L;
+        Long part1NodeId = 3023L;
+        Long part2NodeId = 3024L;
+        Long part1QuestionId = 3025L;
+
+        Material material = Material.builder()
+                .id(materialId)
+                .materialNodeId(rootNodeId)
+                .title("Complete speaking section")
+                .status(MaterialStatus.DRAFT)
+                .version(1L)
+                .build();
+
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Complete speaking section").build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Part 1").build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).parentNodeId(rootNodeId).displayOrder(1).title("Part 2").build();
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
+        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1")));
+        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of(
+                questionNode(3026L, part2NodeId, 0, "P2 Q1"),
+                questionNode(3027L, part2NodeId, 1, "P2 Q2"),
+                questionNode(3028L, part2NodeId, 2, "P2 Q3")
+        ));
+        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of(imageAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(part1QuestionId)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3026L)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3027L)).thenReturn(List.of(audioAsset()));
+        when(materialAssetRepository.findByMaterialNodeId(3028L)).thenReturn(List.of(audioAsset()));
+
+        assertThatThrownBy(() -> service.publishSpeakingSection(materialId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Part 2 must have exactly 4 questions");
+
+        verify(materialRepository, never()).save(any(Material.class));
+    }
+
+    private static MaterialNode questionNode(Long id, Long parentNodeId, int displayOrder, String transcriptText) {
+        return MaterialNode.builder()
+                .id(id)
+                .parentNodeId(parentNodeId)
+                .kind("ITEM")
+                .displayOrder(displayOrder)
+                .transcriptText(transcriptText)
+                .build();
+    }
+
+    private static MaterialAsset imageAsset() {
+        MaterialAsset asset = new MaterialAsset();
+        asset.setKind(MaterialAsset.Kind.IMAGE);
+        asset.setStorageKey("speaking/1001/part1/image/image.png");
+        return asset;
+    }
+
+    private static MaterialAsset audioAsset() {
+        MaterialAsset asset = new MaterialAsset();
+        asset.setKind(MaterialAsset.Kind.AUDIO);
+        asset.setStorageKey("speaking/1001/part1/audio/question_1.mp3");
+        return asset;
     }
 }
 

@@ -1,5 +1,6 @@
 package com.timcritt.tfg.infrastructure.web.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -37,6 +38,11 @@ public class TOEFLSpeakingSectionUpdateDto {
     public static class QuestionPartialUpdate {
         private String transcriptText;
         /** JSON string representation of the question config object. */
+        @Schema(
+                description = "Question config as a JSON string in multipart form data.",
+                type = "string",
+                example = "{\"prepTimeSeconds\":15,\"timeLimitSeconds\":45}"
+        )
         private String config;
         private MultipartFile audio;
         private Boolean removeAudio;

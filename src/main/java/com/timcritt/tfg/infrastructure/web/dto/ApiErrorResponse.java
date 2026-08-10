@@ -12,7 +12,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(requiredProperties = {"message", "errors"})
+@Schema(requiredProperties = {"message"})
 public class ApiErrorResponse {
     @Schema(description = "Human-readable error summary", example = "Validation failed")
     private String message;
@@ -20,6 +20,7 @@ public class ApiErrorResponse {
     @Schema(
             description = "Optional field-level errors keyed by field name",
             type = "object",
+            additionalProperties = Schema.AdditionalPropertiesValue.TRUE,
             example = "{\"materialTitle\":\"must not be blank\"}"
     )
     private Map<String, String> errors;

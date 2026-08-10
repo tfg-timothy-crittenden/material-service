@@ -4,7 +4,10 @@ import com.timcritt.tfg.infrastructure.security.authorization.grpc.Authorization
 import com.timcritt.tfg.infrastructure.security.authorization.grpc.AuthorizationCheckResponse;
 import com.timcritt.tfg.infrastructure.security.authorization.grpc.ClassroomAuthorizationServiceGrpc;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.MetadataUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationPort {
 
     private final ManagedChannel classroomAuthorizationManagedChannel;
-    private final ClassroomAuthorizationProperties properties;
+    private final ClassroomAuthorizationGrpcProperties properties;
 
     @Override
     public MaterialAccessCheckResponse checkReadAccess(String userId, Long materialId) {
@@ -29,15 +32,8 @@ public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationP
                 .setAction("READ")
                 .build();
 
-        ClassroomAuthorizationServiceGrpc.ClassroomAuthorizationServiceBlockingStub stub =
-                ClassroomAuthorizationServiceGrpc.newBlockingStub(classroomAuthorizationManagedChannel);
-
-        if (properties.getGrpc().getDeadlineMillis() > 0) {
-            stub = stub.withDeadlineAfter(properties.getGrpc().getDeadlineMillis(), TimeUnit.MILLISECONDS);
-        }
-
         try {
-            AuthorizationCheckResponse response = stub.checkMaterialAccess(request);
+            AuthorizationCheckResponse response = invokeWithRetry(request);
             if (response == null) {
                 throw new ClassroomAuthorizationUnavailableException("Authorization service returned empty gRPC response", null);
             }
@@ -49,6 +45,49 @@ public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationP
             throw new ClassroomAuthorizationUnavailableException(
                     "Classroom authorization gRPC call failed: " + ex.getStatus(), ex);
         }
+    }
+
+    private AuthorizationCheckResponse invokeWithRetry(AuthorizationCheckRequest request) {
+        try {
+            return invokeOnce(request);
+        } catch (StatusRuntimeException ex) {
+            if (ex.getStatus().getCode() == Status.Code.UNAUTHENTICATED) {
+                log.warn("Classroom authorization gRPC rejected internal credentials for user {} and material {}: {}",
+                        request.getUserId(), request.getMaterialId(), ex.getStatus());
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Classroom authorization rejected internal credentials");
+            }
+
+            if (ex.getStatus().getCode() != Status.Code.UNAVAILABLE) {
+                throw ex;
+            }
+
+            log.warn("Classroom authorization gRPC unavailable for user {} and material {}: {}. Retrying once.",
+                    request.getUserId(), request.getMaterialId(), ex.getStatus());
+
+            try {
+                return invokeOnce(request);
+            } catch (StatusRuntimeException retryEx) {
+                throw new ClassroomAuthorizationUnavailableException(
+                        "Classroom authorization gRPC call failed after retry: " + retryEx.getStatus(),
+                        retryEx);
+            }
+        }
+    }
+
+    private AuthorizationCheckResponse invokeOnce(AuthorizationCheckRequest request) {
+        Metadata headers = new Metadata();
+        Metadata.Key<String> headerKey = Metadata.Key.of("x-internal-api-key", Metadata.ASCII_STRING_MARSHALLER);
+        headers.put(headerKey, properties.getInternalApiKey() == null ? "" : properties.getInternalApiKey());
+
+        ClassroomAuthorizationServiceGrpc.ClassroomAuthorizationServiceBlockingStub stub =
+                ClassroomAuthorizationServiceGrpc.newBlockingStub(classroomAuthorizationManagedChannel)
+                        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers));
+
+        if (properties.getDeadlineMillis() > 0) {
+            stub = stub.withDeadlineAfter(properties.getDeadlineMillis(), TimeUnit.MILLISECONDS);
+        }
+        return stub.checkMaterialAccess(request);
     }
 }
 

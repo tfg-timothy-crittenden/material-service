@@ -7,6 +7,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -57,6 +59,43 @@ class OpenApiDocumentationTest {
                         .param("bucket", "materials")
                         .param("objectKey", "sample.mp3"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void openApi_contract_exposesTypedSchemas() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.schemas.SpeakingSectionSummaryDto.required", hasItem("materialId")))
+                .andExpect(jsonPath("$.components.schemas.SpeakingSectionEditDto.required", hasItem("materialId")))
+                .andExpect(jsonPath("$.components.schemas.MaterialNodeWithAssetsDto.required", hasItem("kind")))
+                .andExpect(jsonPath("$.components.schemas.MaterialAssetDto.required", hasItem("kind")))
+                .andExpect(jsonPath("$.components.schemas.MaterialAssetDto.properties.kind.enum", hasItem("AUDIO")))
+                .andExpect(jsonPath("$.components.schemas.MaterialNodeWithAssetsDto.properties.kind.enum", hasItem("ITEM")))
+                .andExpect(jsonPath("$.components.schemas.QuestionEditDto.properties.config.additionalProperties").value(true))
+                .andExpect(jsonPath("$.components.schemas.MaterialNodeWithAssetsDto.properties.config.additionalProperties").value(true))
+                .andExpect(jsonPath("$.components.schemas.QuestionUpload.properties.config.type").value("string"))
+                .andExpect(jsonPath("$.components.schemas.ApiErrorResponse.required", hasItem("message")))
+                .andExpect(jsonPath("$.components.schemas.ApiErrorResponse.required", not(hasItem("errors"))))
+                .andExpect(jsonPath("$.components.schemas.ApiErrorResponse.properties.errors.additionalProperties").value(true))
+                .andExpect(jsonPath("$['paths']['/api/toefl-speaking/material/section/upload']['post']['responses']['200']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("DraftSaveResponseDto")))
+                .andExpect(jsonPath("$['paths']['/api/toefl-speaking/material/section/upload']['post']['responses']['400']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("ApiErrorResponse")))
+                .andExpect(jsonPath("$['paths']['/api/toefl-speaking/material/section/upload']['post']['responses']['401']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("ApiErrorResponse")))
+                .andExpect(jsonPath("$['paths']['/api/toefl-speaking/material/section/upload']['post']['responses']['403']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("ApiErrorResponse")))
+                .andExpect(jsonPath("$['paths']['/api/toefl-speaking/material/section/upload']['post']['responses']['503']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("ApiErrorResponse")))
+                .andExpect(jsonPath("$['paths']['/api/storage/presigned-url']['get']['responses']['400']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("ApiErrorResponse")))
+                .andExpect(jsonPath("$['paths']['/api/storage/presigned-url']['get']['responses']['401']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("ApiErrorResponse")))
+                .andExpect(jsonPath("$['paths']['/api/storage/presigned-url']['get']['responses']['403']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("ApiErrorResponse")))
+                .andExpect(jsonPath("$['paths']['/api/storage/presigned-url']['get']['responses']['503']['content']['application/json']['schema']['$ref']")
+                        .value(containsString("ApiErrorResponse")))
+                .andExpect(jsonPath("$.components.schemas.ApiErrorResponse").exists());
     }
 }
 

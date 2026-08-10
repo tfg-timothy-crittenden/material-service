@@ -1,6 +1,7 @@
 package com.timcritt.tfg.infrastructure.web.dto;
 
 import com.timcritt.tfg.domain.model.MaterialStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,6 +13,10 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(requiredProperties = {
+        "materialId", "sectionId", "sectionTitle", "part1Id", "part1Title",
+        "part2Id", "part2Title", "status", "createdAt", "updatedAt"
+})
 public class SpeakingSectionSummaryDto {
     private Long materialId;
     private Long sectionId;
