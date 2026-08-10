@@ -23,7 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.flyway.enabled=false",
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.cloud.config.enabled=false",
-        "eureka.client.enabled=false"
+        "eureka.client.enabled=false",
+        "authorization.classroom.transport=http"
 })
 @AutoConfigureMockMvc
 class OpenApiDocumentationTest {
