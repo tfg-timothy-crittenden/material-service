@@ -4,7 +4,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 
 @Configuration
-@ConditionalOnProperty(prefix = "authorization.classroom", name = "transport", havingValue = "grpc")
 public class ClassroomAuthorizationGrpcConfig {
 
     @Bean(destroyMethod = "shutdownNow")

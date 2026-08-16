@@ -10,14 +10,12 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(prefix = "authorization.classroom", name = "transport", havingValue = "grpc")
 @RequiredArgsConstructor
 public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationPort {
 
