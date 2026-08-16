@@ -11,8 +11,6 @@ class ClassroomAuthorizationTransportConditionTest {
             .withUserConfiguration(
                     ClassroomAuthorizationGrpcConfig.class,
                     ClassroomAuthorizationGrpcClient.class,
-                    MaterialReadAuthorizationService.class,
-                    MaterialReadAccessAspect.class,
                     ClassroomAuthorizationGrpcProperties.class,
                     ClassroomAuthorizationProperties.class)
             .withPropertyValues("authorization.classroom.transport=http");
