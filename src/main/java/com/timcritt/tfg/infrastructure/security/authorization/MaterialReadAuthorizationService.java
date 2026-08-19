@@ -2,6 +2,7 @@ package com.timcritt.tfg.infrastructure.security.authorization;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,7 +15,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MaterialReadAuthorizationService {
 
-    private final ClassroomAuthorizationPort authorizationClient;
+    private final ObjectProvider<ClassroomAuthorizationPort> authorizationClientProvider;
     private final ClassroomAuthorizationProperties properties;
 
     public void assertCanRead(Long materialId) {
@@ -26,6 +27,13 @@ public class MaterialReadAuthorizationService {
         }
 
         String userId = resolveCurrentUserId();
+        ClassroomAuthorizationPort authorizationClient = authorizationClientProvider.getIfAvailable();
+        if (authorizationClient == null) {
+            throw new ClassroomAuthorizationUnavailableException(
+                    "Classroom authorization is enabled but no authorization transport client is configured",
+                    null);
+        }
+
         try {
             ClassroomAuthorizationPort.MaterialAccessCheckResponse response =
                     authorizationClient.checkReadAccess(userId, materialId);
@@ -65,4 +73,3 @@ public class MaterialReadAuthorizationService {
         throw new UnauthenticatedUserException("Unable to resolve user identity from authenticated token");
     }
 }
-

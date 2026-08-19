@@ -10,6 +10,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
@@ -17,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "authorization.classroom", name = "transport", havingValue = "grpc", matchIfMissing = true)
 public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationPort {
 
     private final ManagedChannel classroomAuthorizationManagedChannel;
@@ -88,4 +90,3 @@ public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationP
         return stub.checkMaterialAccess(request);
     }
 }
-
