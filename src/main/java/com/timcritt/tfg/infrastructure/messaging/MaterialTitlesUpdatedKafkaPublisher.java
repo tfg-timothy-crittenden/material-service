@@ -26,8 +26,8 @@ public class MaterialTitlesUpdatedKafkaPublisher implements MaterialTitlesUpdate
 
     @Override
     public void publishMaterialTitlesUpdated(MaterialTitlesUpdatedEvent event) {
-        if (event == null || event.getMaterialId() == null) {
-            throw new IllegalArgumentException("material titles updated event with materialId is required");
+        if (event == null || event.getMaterialId() == null || event.getVersion() == null) {
+            throw new IllegalArgumentException("material titles updated event with materialId and version is required");
         }
 
         try {

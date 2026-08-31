@@ -420,21 +420,24 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         String changedMaterialTitle = null;
         String changedPart1Title = null;
         String changedPart2Title = null;
+        Material material = null;
+        boolean materialDirty = false;
+        boolean titlesChanged = false;
 
         try {
             // ── Load material and root section node ──────────────────────────────
-            Material material = materialRepository.findById(command.getMaterialId())
+            material = materialRepository.findById(command.getMaterialId())
                     .orElseThrow(() -> new IllegalArgumentException("Material not found: " + command.getMaterialId()));
             MaterialNode rootNode = materialNodeRepository.findById(material.getMaterialNodeId())
                     .orElseThrow(() -> new IllegalArgumentException("Root section node not found for material: " + command.getMaterialId()));
             storageKeysBeforeUpdate = collectStorageKeysForSubtree(rootNode.getId());
 
             // ── Update material text fields ──────────────────────────────────────
-            boolean materialDirty = false;
             if (hasText(command.getMaterialTitle()) && !Objects.equals(material.getTitle(), command.getMaterialTitle())) {
                 material.setTitle(command.getMaterialTitle());
                 rootNode.setTitle(command.getMaterialTitle());
                 changedMaterialTitle = command.getMaterialTitle();
+                titlesChanged = true;
                 materialDirty = true;
             }
             if (command.getMaterialDescription() != null) {
@@ -458,6 +461,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             if (hasText(command.getPartTitle()) && !Objects.equals(part1.getTitle(), command.getPartTitle())) {
                 part1.setTitle(command.getPartTitle());
                 changedPart1Title = command.getPartTitle();
+                titlesChanged = true;
                 part1.setUpdatedAt(Instant.now());
                 part1.setVersion(part1.getVersion() + 1);
                 materialNodeRepository.save(part1);
@@ -494,6 +498,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 if (hasText(command.getPart2Title()) && !Objects.equals(part2.getTitle(), command.getPart2Title())) {
                     part2.setTitle(command.getPart2Title());
                     changedPart2Title = command.getPart2Title();
+                    titlesChanged = true;
                     part2.setUpdatedAt(Instant.now());
                     part2.setVersion(part2.getVersion() + 1);
                     materialNodeRepository.save(part2);
@@ -534,9 +539,17 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             }
         }
 
-        if (changedMaterialTitle != null || changedPart1Title != null || changedPart2Title != null) {
+        if (titlesChanged && !materialDirty) {
+            Instant now = Instant.now();
+            material.setUpdatedAt(now);
+            material.setVersion(material.getVersion() + 1);
+            materialRepository.save(material);
+        }
+
+        if (titlesChanged) {
             titlesUpdatedEventPublisher.publishMaterialTitlesUpdated(MaterialTitlesUpdatedEvent.builder()
                     .materialId(command.getMaterialId())
+                    .version(material.getVersion())
                     .materialTitle(changedMaterialTitle)
                     .part1Title(changedPart1Title)
                     .part2Title(changedPart2Title)

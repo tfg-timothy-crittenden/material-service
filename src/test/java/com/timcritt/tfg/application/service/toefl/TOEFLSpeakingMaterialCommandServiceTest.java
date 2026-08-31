@@ -414,7 +414,60 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         verify(titlesUpdatedEventPublisher, times(1)).publishMaterialTitlesUpdated(eventCaptor.capture());
         MaterialTitlesUpdatedEvent event = eventCaptor.getValue();
         assertThat(event.getMaterialId()).isEqualTo(materialId);
+        assertThat(event.getVersion()).isEqualTo(2L);
         assertThat(event.getMaterialTitle()).isEqualTo("New Material");
+        assertThat(event.getPart1Title()).isEqualTo("New Part 1");
+        assertThat(event.getPart2Title()).isEqualTo("New Part 2");
+        assertThat(event.getUpdatedAt()).isNotNull();
+
+        var materialCaptor = forClass(Material.class);
+        verify(materialRepository, times(1)).save(materialCaptor.capture());
+        assertThat(materialCaptor.getValue().getVersion()).isEqualTo(2L);
+    }
+
+    @Test
+    void updateSpeakingSection_partTitlesChanged_bumpsMaterialVersionAndPublishesVersionedTitlesEvent() {
+        Long materialId = 903L;
+        Long rootNodeId = 930L;
+        Long part1NodeId = 931L;
+        Long part2NodeId = 932L;
+
+        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).title("Old Material").version(1L).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Old Material").version(1L).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Old Part 1").version(1L).build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).parentNodeId(rootNodeId).displayOrder(1).title("Old Part 2").version(1L).build();
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
+        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
+        when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1, part2));
+        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
+        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
+        when(materialAssetRepository.findByMaterialNodeId(part2NodeId)).thenReturn(List.of());
+
+        TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .partTitle("New Part 1")
+                .part2Title("New Part 2")
+                .build();
+
+        service.updateSpeakingSection(command);
+
+        var materialCaptor = forClass(Material.class);
+        verify(materialRepository, times(1)).save(materialCaptor.capture());
+        assertThat(materialCaptor.getValue().getVersion()).isEqualTo(2L);
+
+        var eventCaptor = forClass(MaterialTitlesUpdatedEvent.class);
+        verify(titlesUpdatedEventPublisher, times(1)).publishMaterialTitlesUpdated(eventCaptor.capture());
+        MaterialTitlesUpdatedEvent event = eventCaptor.getValue();
+        assertThat(event.getMaterialId()).isEqualTo(materialId);
+        assertThat(event.getVersion()).isEqualTo(2L);
+        assertThat(event.getMaterialTitle()).isNull();
         assertThat(event.getPart1Title()).isEqualTo("New Part 1");
         assertThat(event.getPart2Title()).isEqualTo("New Part 2");
         assertThat(event.getUpdatedAt()).isNotNull();

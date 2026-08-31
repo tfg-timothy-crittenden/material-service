@@ -27,6 +27,7 @@ class MaterialTitlesUpdatedKafkaPublisherTest {
 
         MaterialTitlesUpdatedEvent event = MaterialTitlesUpdatedEvent.builder()
                 .materialId(42L)
+                .version(7L)
                 .materialTitle("New Material")
                 .part1Title("New Part 1")
                 .part2Title("New Part 2")
@@ -35,11 +36,15 @@ class MaterialTitlesUpdatedKafkaPublisherTest {
 
         publisher.publishMaterialTitlesUpdated(event);
 
+        org.mockito.ArgumentCaptor<String> payloadCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(kafkaTemplate, times(1)).send(
                 org.mockito.ArgumentMatchers.eq("material.titles.updated.v1"),
                 org.mockito.ArgumentMatchers.eq("42"),
-                org.mockito.ArgumentMatchers.contains("\"materialId\":42")
+                payloadCaptor.capture()
         );
+        org.assertj.core.api.Assertions.assertThat(payloadCaptor.getValue())
+                .contains("\"materialId\":42")
+                .contains("\"version\":7");
     }
 }
 
