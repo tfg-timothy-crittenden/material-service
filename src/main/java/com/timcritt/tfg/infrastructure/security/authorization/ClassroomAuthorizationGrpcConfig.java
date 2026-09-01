@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @Configuration
-@ConditionalOnProperty(prefix = "authorization.classroom", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "authorization.classroom", name = "transport", havingValue = "grpc", matchIfMissing = true)
 public class ClassroomAuthorizationGrpcConfig {
 
     @Bean(destroyMethod = "shutdownNow")
@@ -60,4 +60,3 @@ public class ClassroomAuthorizationGrpcConfig {
                         null));
     }
 }
-

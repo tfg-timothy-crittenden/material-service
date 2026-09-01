@@ -26,7 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.kafka.listener.auto-startup=false",
         "authorization.classroom.enabled=false",
         "spring.cloud.config.enabled=false",
-        "eureka.client.enabled=false"
+        "eureka.client.enabled=false",
+        "authorization.classroom.transport=http"
 })
 @TestPropertySource(properties = "authorization.classroom.enabled=false")
 @AutoConfigureMockMvc

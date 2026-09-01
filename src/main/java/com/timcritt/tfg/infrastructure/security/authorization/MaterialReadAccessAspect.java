@@ -47,4 +47,3 @@ public class MaterialReadAccessAspect {
         throw new IllegalArgumentException("Method annotated with @RequireMaterialReadAccess must define one @MaterialId parameter");
     }
 }
-

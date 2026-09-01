@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 @ConditionalOnProperty(prefix = "authorization.classroom", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "authorization.classroom", name = "transport", havingValue = "grpc", matchIfMissing = true)
 public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationPort {
 
     private final ManagedChannel classroomAuthorizationManagedChannel;
@@ -90,4 +91,3 @@ public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationP
         return stub.checkMaterialAccess(request);
     }
 }
-
