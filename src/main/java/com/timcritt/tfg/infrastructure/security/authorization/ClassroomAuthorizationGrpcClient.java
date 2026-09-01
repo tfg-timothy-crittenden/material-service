@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "authorization.classroom", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "authorization.classroom", name = "transport", havingValue = "grpc", matchIfMissing = true)
 public class ClassroomAuthorizationGrpcClient implements ClassroomAuthorizationPort {

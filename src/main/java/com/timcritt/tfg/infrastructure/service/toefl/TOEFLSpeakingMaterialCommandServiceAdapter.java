@@ -5,9 +5,9 @@ import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
 import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
+import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.MaterialTitlesUpdatedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.application.service.toefl.TOEFLSpeakingMaterialCommandService;
 import org.springframework.stereotype.Service;
@@ -23,14 +23,14 @@ public class TOEFLSpeakingMaterialCommandServiceAdapter implements TOEFLSpeaking
             MaterialAssetRepositoryPort materialAssetRepository,
             StorageRepositoryPort storageRepositoryPort,
             MaterialDeletionEventPublisherPort deletionEventPublisher,
-            MaterialTitlesUpdatedEventPublisherPort titlesUpdatedEventPublisher) {
+            MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher) {
         this.delegate = new TOEFLSpeakingMaterialCommandService(
                 materialRepository,
                 materialNodeRepository,
                 materialAssetRepository,
                 storageRepositoryPort,
                 deletionEventPublisher,
-                titlesUpdatedEventPublisher
+                detailsUpsertedEventPublisher
         );
     }
 

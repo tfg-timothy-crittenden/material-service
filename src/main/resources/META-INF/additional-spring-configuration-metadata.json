@@ -1,0 +1,25 @@
+{
+  "properties": [
+    {
+      "name": "messaging.kafka.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enables or disables Kafka listeners for material-service."
+    },
+    {
+      "name": "material.kafka.material-details-requested-topic",
+      "type": "java.lang.String",
+      "description": "Kafka topic used for material details requests."
+    },
+    {
+      "name": "material.kafka.material-details-requested-group-id",
+      "type": "java.lang.String",
+      "description": "Kafka consumer group id used for material details requests."
+    },
+    {
+      "name": "material.kafka.material-details-upserted-topic",
+      "type": "java.lang.String",
+      "description": "Kafka topic used for material details upsert events."
+    }
+  ]
+}
+

@@ -14,20 +14,26 @@ public class MaterialTitlesUpdatedKafkaPublisher implements MaterialTitlesUpdate
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final String topic;
+    private final boolean enabled;
 
     public MaterialTitlesUpdatedKafkaPublisher(
             KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
-            @Value("${messaging.topics.material-titles-updated:material.titles.updated.v1}") String topic) {
+            @Value("${messaging.topics.material-titles-updated:material.titles.updated.v1}") String topic,
+            @Value("${messaging.topics.material-titles-updated.enabled:true}") boolean enabled) {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.topic = topic;
+        this.enabled = enabled;
     }
 
     @Override
     public void publishMaterialTitlesUpdated(MaterialTitlesUpdatedEvent event) {
-        if (event == null || event.getMaterialId() == null) {
-            throw new IllegalArgumentException("material titles updated event with materialId is required");
+        if (event == null || event.getMaterialId() == null || event.getVersion() == null) {
+            throw new IllegalArgumentException("material titles updated event with materialId and version is required");
+        }
+        if (!enabled) {
+            return;
         }
 
         try {
@@ -38,4 +44,5 @@ public class MaterialTitlesUpdatedKafkaPublisher implements MaterialTitlesUpdate
         }
     }
 }
+
 
