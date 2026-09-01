@@ -6,10 +6,10 @@ import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
-import com.timcritt.tfg.domain.event.MaterialTitlesUpdatedEvent;
+import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
 import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
-import com.timcritt.tfg.application.port.outbound.MaterialTitlesUpdatedEventPublisherPort;
+import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
@@ -42,7 +42,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     private final MaterialAssetRepositoryPort materialAssetRepository;
     private final StorageRepositoryPort storageRepositoryPort;
     private final MaterialDeletionEventPublisherPort deletionEventPublisher;
-    private final MaterialTitlesUpdatedEventPublisherPort titlesUpdatedEventPublisher;
+    private final MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher;
 
     public TOEFLSpeakingMaterialCommandService(
             MaterialRepositoryPort materialRepository,
@@ -50,13 +50,13 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             MaterialAssetRepositoryPort materialAssetRepository,
             StorageRepositoryPort storageRepositoryPort,
             MaterialDeletionEventPublisherPort deletionEventPublisher,
-            MaterialTitlesUpdatedEventPublisherPort titlesUpdatedEventPublisher) {
+            MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher) {
         this.materialRepository = materialRepository;
         this.materialNodeRepository = materialNodeRepository;
         this.materialAssetRepository = materialAssetRepository;
         this.storageRepositoryPort = storageRepositoryPort;
         this.deletionEventPublisher = deletionEventPublisher;
-        this.titlesUpdatedEventPublisher = titlesUpdatedEventPublisher;
+        this.detailsUpsertedEventPublisher = detailsUpsertedEventPublisher;
     }
 
     @Override
@@ -417,10 +417,8 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         List<String> uploadedKeys = new ArrayList<>();
         Set<String> storageKeysBeforeUpdate = Set.of();
         Set<String> storageKeysAfterUpdate = Set.of();
-        String changedMaterialTitle = null;
-        String changedPart1Title = null;
-        String changedPart2Title = null;
-        Material material = null;
+        Material material;
+        MaterialNode rootNode;
         boolean materialDirty = false;
         boolean titlesChanged = false;
 
@@ -428,7 +426,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             // ── Load material and root section node ──────────────────────────────
             material = materialRepository.findById(command.getMaterialId())
                     .orElseThrow(() -> new IllegalArgumentException("Material not found: " + command.getMaterialId()));
-            MaterialNode rootNode = materialNodeRepository.findById(material.getMaterialNodeId())
+            rootNode = materialNodeRepository.findById(material.getMaterialNodeId())
                     .orElseThrow(() -> new IllegalArgumentException("Root section node not found for material: " + command.getMaterialId()));
             storageKeysBeforeUpdate = collectStorageKeysForSubtree(rootNode.getId());
 
@@ -436,7 +434,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             if (hasText(command.getMaterialTitle()) && !Objects.equals(material.getTitle(), command.getMaterialTitle())) {
                 material.setTitle(command.getMaterialTitle());
                 rootNode.setTitle(command.getMaterialTitle());
-                changedMaterialTitle = command.getMaterialTitle();
                 titlesChanged = true;
                 materialDirty = true;
             }
@@ -460,7 +457,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
             if (hasText(command.getPartTitle()) && !Objects.equals(part1.getTitle(), command.getPartTitle())) {
                 part1.setTitle(command.getPartTitle());
-                changedPart1Title = command.getPartTitle();
                 titlesChanged = true;
                 part1.setUpdatedAt(Instant.now());
                 part1.setVersion(part1.getVersion() + 1);
@@ -497,7 +493,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
                 if (hasText(command.getPart2Title()) && !Objects.equals(part2.getTitle(), command.getPart2Title())) {
                     part2.setTitle(command.getPart2Title());
-                    changedPart2Title = command.getPart2Title();
                     titlesChanged = true;
                     part2.setUpdatedAt(Instant.now());
                     part2.setVersion(part2.getVersion() + 1);
@@ -547,15 +542,22 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         }
 
         if (titlesChanged) {
-            titlesUpdatedEventPublisher.publishMaterialTitlesUpdated(MaterialTitlesUpdatedEvent.builder()
+            detailsUpsertedEventPublisher.publishMaterialDetailsUpserted(MaterialDetailsUpsertedEvent.builder()
                     .materialId(command.getMaterialId())
                     .version(material.getVersion())
-                    .materialTitle(changedMaterialTitle)
-                    .part1Title(changedPart1Title)
-                    .part2Title(changedPart2Title)
+                    .materialTitle(material.getTitle())
+                    .part1Title(resolvePartTitle(rootNode.getId(), 0))
+                    .part2Title(resolvePartTitle(rootNode.getId(), 1))
+                    .description(material.getDescription())
                     .updatedAt(Instant.now())
-                    .build());
+                    .build(), null);
         }
+    }
+
+    private String resolvePartTitle(Long rootNodeId, int displayOrder) {
+        return materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, displayOrder)
+                .map(MaterialNode::getTitle)
+                .orElse(null);
     }
 
     /**

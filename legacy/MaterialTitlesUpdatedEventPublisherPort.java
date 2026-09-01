@@ -6,3 +6,4 @@ public interface MaterialTitlesUpdatedEventPublisherPort {
     void publishMaterialTitlesUpdated(MaterialTitlesUpdatedEvent event);
 }
 
+

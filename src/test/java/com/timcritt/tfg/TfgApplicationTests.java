@@ -2,6 +2,7 @@ package com.timcritt.tfg;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest(properties = {
         // Use H2 in-memory database for tests so DataSource auto-config succeeds
@@ -13,12 +14,16 @@ import org.springframework.boot.test.context.SpringBootTest;
         "spring.flyway.enabled=false",
           // No schema creation is needed for this smoke test
           "spring.jpa.hibernate.ddl-auto=none",
+        "spring.kafka.listener.auto-startup=false",
+        "authorization.classroom.enabled=false",
         // Disable trying to contact cloud config
           "spring.cloud.config.enabled=false",
           // Keep the smoke test fully local
           "eureka.client.enabled=false"
 })
+    @TestPropertySource(properties = "authorization.classroom.enabled=false")
 class TfgApplicationTests {
+
 
     @Test
     void contextLoads() {

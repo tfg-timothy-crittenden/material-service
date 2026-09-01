@@ -2,16 +2,16 @@ package com.timcritt.tfg.application.service.toefl;
 
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionUploadCommand;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
-import com.timcritt.tfg.domain.event.MaterialTitlesUpdatedEvent;
+import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
 import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
+import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.MaterialTitlesUpdatedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.Material;
@@ -44,7 +44,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     private final MaterialAssetRepositoryPort materialAssetRepository = mock(MaterialAssetRepositoryPort.class);
     private final StorageRepositoryPort storageRepositoryPort = mock(StorageRepositoryPort.class);
     private final MaterialDeletionEventPublisherPort deletionEventPublisher = mock(MaterialDeletionEventPublisherPort.class);
-    private final MaterialTitlesUpdatedEventPublisherPort titlesUpdatedEventPublisher = mock(MaterialTitlesUpdatedEventPublisherPort.class);
+    private final MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher = mock(MaterialDetailsUpsertedEventPublisherPort.class);
 
     private final TOEFLSpeakingMaterialCommandService service = new TOEFLSpeakingMaterialCommandService(
             materialRepository,
@@ -52,7 +52,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
             materialAssetRepository,
             storageRepositoryPort,
             deletionEventPublisher,
-            titlesUpdatedEventPublisher
+            detailsUpsertedEventPublisher
     );
 
     @Test
@@ -410,14 +410,15 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         service.updateSpeakingSection(command);
 
-        var eventCaptor = forClass(MaterialTitlesUpdatedEvent.class);
-        verify(titlesUpdatedEventPublisher, times(1)).publishMaterialTitlesUpdated(eventCaptor.capture());
-        MaterialTitlesUpdatedEvent event = eventCaptor.getValue();
+        var eventCaptor = forClass(MaterialDetailsUpsertedEvent.class);
+        verify(detailsUpsertedEventPublisher, times(1)).publishMaterialDetailsUpserted(eventCaptor.capture(), org.mockito.ArgumentMatchers.isNull());
+        MaterialDetailsUpsertedEvent event = eventCaptor.getValue();
         assertThat(event.getMaterialId()).isEqualTo(materialId);
         assertThat(event.getVersion()).isEqualTo(2L);
         assertThat(event.getMaterialTitle()).isEqualTo("New Material");
         assertThat(event.getPart1Title()).isEqualTo("New Part 1");
         assertThat(event.getPart2Title()).isEqualTo("New Part 2");
+        assertThat(event.getDescription()).isNull();
         assertThat(event.getUpdatedAt()).isNotNull();
 
         var materialCaptor = forClass(Material.class);
@@ -462,14 +463,15 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         verify(materialRepository, times(1)).save(materialCaptor.capture());
         assertThat(materialCaptor.getValue().getVersion()).isEqualTo(2L);
 
-        var eventCaptor = forClass(MaterialTitlesUpdatedEvent.class);
-        verify(titlesUpdatedEventPublisher, times(1)).publishMaterialTitlesUpdated(eventCaptor.capture());
-        MaterialTitlesUpdatedEvent event = eventCaptor.getValue();
+        var eventCaptor = forClass(MaterialDetailsUpsertedEvent.class);
+        verify(detailsUpsertedEventPublisher, times(1)).publishMaterialDetailsUpserted(eventCaptor.capture(), org.mockito.ArgumentMatchers.isNull());
+        MaterialDetailsUpsertedEvent event = eventCaptor.getValue();
         assertThat(event.getMaterialId()).isEqualTo(materialId);
         assertThat(event.getVersion()).isEqualTo(2L);
-        assertThat(event.getMaterialTitle()).isNull();
+        assertThat(event.getMaterialTitle()).isEqualTo("Old Material");
         assertThat(event.getPart1Title()).isEqualTo("New Part 1");
         assertThat(event.getPart2Title()).isEqualTo("New Part 2");
+        assertThat(event.getDescription()).isNull();
         assertThat(event.getUpdatedAt()).isNotNull();
     }
 
@@ -500,7 +502,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         service.updateSpeakingSection(command);
 
-        verify(titlesUpdatedEventPublisher, never()).publishMaterialTitlesUpdated(any(MaterialTitlesUpdatedEvent.class));
+        verify(detailsUpsertedEventPublisher, never()).publishMaterialDetailsUpserted(any(MaterialDetailsUpsertedEvent.class), any());
     }
 
     @Test
