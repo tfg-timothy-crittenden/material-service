@@ -1,18 +1,13 @@
 package com.timcritt.tfg.application.service.toefl;
 
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionUploadCommand;
+import com.timcritt.tfg.application.port.outbound.*;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
-import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
-import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
-import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialNode;
@@ -45,6 +40,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     private final StorageRepositoryPort storageRepositoryPort = mock(StorageRepositoryPort.class);
     private final MaterialDeletionEventPublisherPort deletionEventPublisher = mock(MaterialDeletionEventPublisherPort.class);
     private final MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher = mock(MaterialDetailsUpsertedEventPublisherPort.class);
+    private final IntegrationEventOutboxPort outboxPort = mock(IntegrationEventOutboxPort.class);
 
     private final TOEFLSpeakingMaterialCommandService service = new TOEFLSpeakingMaterialCommandService(
             materialRepository,
@@ -52,7 +48,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
             materialAssetRepository,
             storageRepositoryPort,
             deletionEventPublisher,
-            detailsUpsertedEventPublisher
+            detailsUpsertedEventPublisher,
+            outboxPort
     );
 
     @Test

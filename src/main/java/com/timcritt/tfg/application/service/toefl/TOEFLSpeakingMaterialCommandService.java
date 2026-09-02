@@ -5,31 +5,22 @@ import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateComma
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
+import com.timcritt.tfg.application.port.outbound.*;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
-import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
-import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
-import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.MaterialNode;
 import com.timcritt.tfg.domain.model.MaterialStatus;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
-import java.util.ArrayDeque;
+import java.util.*;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+
+import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DETAILS_UPSERTED;
 
 public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMaterialCommandUseCase {
     private static final Long TOEFL_SKILL_ID = 4L;
@@ -43,6 +34,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     private final StorageRepositoryPort storageRepositoryPort;
     private final MaterialDeletionEventPublisherPort deletionEventPublisher;
     private final MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher;
+    private final IntegrationEventOutboxPort outboxPort;
 
     public TOEFLSpeakingMaterialCommandService(
             MaterialRepositoryPort materialRepository,
@@ -50,13 +42,14 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             MaterialAssetRepositoryPort materialAssetRepository,
             StorageRepositoryPort storageRepositoryPort,
             MaterialDeletionEventPublisherPort deletionEventPublisher,
-            MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher) {
+            MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher, IntegrationEventOutboxPort outboxPort) {
         this.materialRepository = materialRepository;
         this.materialNodeRepository = materialNodeRepository;
         this.materialAssetRepository = materialAssetRepository;
         this.storageRepositoryPort = storageRepositoryPort;
         this.deletionEventPublisher = deletionEventPublisher;
         this.detailsUpsertedEventPublisher = detailsUpsertedEventPublisher;
+        this.outboxPort = outboxPort;
     }
 
     @Override
@@ -408,6 +401,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     }
 
     @Override
+    @Transactional
     public void updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand command) {
         if (command == null || command.getMaterialId() == null) {
             throw new IllegalArgumentException("materialId is required");
@@ -542,7 +536,17 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         }
 
         if (titlesChanged) {
-            detailsUpsertedEventPublisher.publishMaterialDetailsUpserted(MaterialDetailsUpsertedEvent.builder()
+//            detailsUpsertedEventPublisher.publishMaterialDetailsUpserted(MaterialDetailsUpsertedEvent.builder()
+//                    .materialId(command.getMaterialId())
+//                    .version(material.getVersion())
+//                    .materialTitle(material.getTitle())
+//                    .part1Title(resolvePartTitle(rootNode.getId(), 0))
+//                    .part2Title(resolvePartTitle(rootNode.getId(), 1))
+//                    .description(material.getDescription())
+//                    .updatedAt(Instant.now())
+//                    .build(), null);
+
+            MaterialDetailsUpsertedEvent event = MaterialDetailsUpsertedEvent.builder()
                     .materialId(command.getMaterialId())
                     .version(material.getVersion())
                     .materialTitle(material.getTitle())
@@ -550,7 +554,15 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                     .part2Title(resolvePartTitle(rootNode.getId(), 1))
                     .description(material.getDescription())
                     .updatedAt(Instant.now())
-                    .build(), null);
+                    .build();
+
+            outboxPort.append(
+                    UUID.randomUUID(),
+                    "Material",
+                    material.getId().toString(),
+                    MATERIAL_DETAILS_UPSERTED,
+                    event
+            );
         }
     }
 
