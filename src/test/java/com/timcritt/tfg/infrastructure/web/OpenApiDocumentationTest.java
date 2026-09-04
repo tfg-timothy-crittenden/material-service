@@ -27,7 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "material.kafka.outbox-relay.enabled=false",
         "authorization.classroom.enabled=false",
         "spring.cloud.config.enabled=false",
-        "eureka.client.enabled=false"
+        "eureka.client.enabled=false",
+        "authorization.classroom.transport=http"
 })
 @TestPropertySource(properties = {"authorization.classroom.enabled=false", "material.kafka.outbox-relay.enabled=false"})
 @AutoConfigureMockMvc
