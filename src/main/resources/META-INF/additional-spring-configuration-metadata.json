@@ -19,6 +19,11 @@
       "name": "material.kafka.material-details-upserted-topic",
       "type": "java.lang.String",
       "description": "Kafka topic used for material details upsert events."
+    },
+    {
+      "name": "material.kafka.outbox-relay.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enables or disables the scheduled Kafka outbox relay."
     }
   ]
 }

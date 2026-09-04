@@ -13,7 +13,6 @@ import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.MaterialNode;
 import com.timcritt.tfg.domain.model.MaterialStatus;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
 import java.util.*;
@@ -385,7 +384,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     }
 
     @Override
-    @Transactional
     public void updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand command) {
         if (command == null || command.getMaterialId() == null) {
             throw new IllegalArgumentException("materialId is required");

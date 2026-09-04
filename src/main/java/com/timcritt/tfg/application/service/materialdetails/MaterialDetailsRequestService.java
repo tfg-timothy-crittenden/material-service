@@ -8,8 +8,6 @@ import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.domain.event.MaterialDetailsRequestedPayload;
 import com.timcritt.tfg.domain.model.Material;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -19,8 +17,6 @@ import java.util.UUID;
 
 import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DETAILS_UPSERTED;
 
-@Service
-@Slf4j
 public class MaterialDetailsRequestService {
 
     private final MaterialRepositoryPort materialRepository;
@@ -46,28 +42,19 @@ public class MaterialDetailsRequestService {
             return;
         }
 
-        log.debug("Processing material details request: requestId={}, materialCount={}",
-                requestId,
-                request.getMaterialIds().size());
-
         for (Long materialId : uniqueMaterialIds(request.getMaterialIds())) {
             if (materialId == null || materialId <= 0) {
-                log.warn("Skipping invalid material id in details request: requestId={}, materialId={}", requestId, materialId);
                 continue;
             }
 
             Optional<Material> materialOpt = materialRepository.findById(materialId);
             if (materialOpt.isEmpty()) {
-                log.warn("Skipping missing material in details request: requestId={}, materialId={}", requestId, materialId);
                 continue;
             }
 
             Optional<SpeakingSectionEditResult> detailsOpt = navigationUseCase.getSpeakingSectionForEdit(materialId);
 
             Material material = materialOpt.get();
-            if (detailsOpt.isEmpty()) {
-                log.warn("Publishing fallback material details for material without speaking edit view: requestId={}, materialId={}", requestId, materialId);
-            }
             SpeakingSectionEditResult details = detailsOpt.orElse(null);
             MaterialDetailsUpsertedEvent event = MaterialDetailsUpsertedEvent.builder()
                     .materialId(material.getId())
