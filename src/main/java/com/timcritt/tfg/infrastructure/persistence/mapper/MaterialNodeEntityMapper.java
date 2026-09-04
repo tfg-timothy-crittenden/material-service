@@ -8,7 +8,7 @@ public class MaterialNodeEntityMapper {
         if (entity == null) return null;
         return MaterialNode.builder()
                 .id(entity.getId())
-                .materialId(null)
+                .materialId(entity.getMaterialId())
                 .parentNodeId(entity.getParentNodeId())
                 .kind(entity.getKind())
                 .title(entity.getTitle())
