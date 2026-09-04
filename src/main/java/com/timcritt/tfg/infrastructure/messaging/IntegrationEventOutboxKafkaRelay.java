@@ -11,6 +11,7 @@ import com.timcritt.tfg.infrastructure.persistence.outbox.OutboxEventJpaEntity;
 import com.timcritt.tfg.infrastructure.persistence.outbox.OutboxEventJpaRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(prefix = "material.kafka.outbox-relay", name = "enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 public class IntegrationEventOutboxKafkaRelay {
 
@@ -112,7 +114,11 @@ public class IntegrationEventOutboxKafkaRelay {
                 materialDeletedTopic,
                 event.getMaterialId());
 
-        kafkaTemplate.send(materialDeletedTopic, String.valueOf(event.getMaterialId()), objectMapper.writeValueAsString(event));
+        ProducerRecord<String, String> record = new ProducerRecord<>(
+                materialDeletedTopic,
+                String.valueOf(event.getMaterialId()),
+                objectMapper.writeValueAsString(event));
+        kafkaTemplate.send(record);
     }
 }
 
