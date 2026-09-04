@@ -18,6 +18,9 @@ public class MaterialNodeJpaEntity {
     @SequenceGenerator(name = "material_node_id_seq", sequenceName = "material_node_id_seq", allocationSize = 1)
     private Long id;
 
+    @Column(name = "material_id", nullable = false)
+    private Long materialId;
+
     @Column(name = "parent_node_id")
     private Long parentNodeId;
 

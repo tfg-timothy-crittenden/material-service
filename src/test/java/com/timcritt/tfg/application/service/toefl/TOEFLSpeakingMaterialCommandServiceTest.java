@@ -52,11 +52,10 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
     @Test
     void uploadSpeakingSection_scaffoldsMissingDraftQuestionNodesForBothParts() {
-        
-        
         AtomicLong nodeIds = new AtomicLong(100L);
         AtomicLong materialIds = new AtomicLong(1000L);
         List<MaterialNode> savedNodes = new ArrayList<>();
+        List<Material> savedMaterials = new ArrayList<>();
 
         // AtomicLong gives the lambda a mutable id counter (local variables captured by lambdas must be effectively final).
         when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> {
@@ -66,6 +65,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
             }
             savedNodes.add(MaterialNode.builder()
                     .id(node.getId())
+                    .materialId(node.getMaterialId())
                     .parentNodeId(node.getParentNodeId())
                     .kind(node.getKind())
                     .title(node.getTitle())
@@ -88,6 +88,17 @@ class TOEFLSpeakingMaterialCommandServiceTest {
             if (material.getId() == null) {
                 material.setId(materialIds.getAndIncrement());
             }
+            savedMaterials.add(Material.builder()
+                    .id(material.getId())
+                    .materialNodeId(material.getMaterialNodeId())
+                    .examFamilyId(material.getExamFamilyId())
+                    .title(material.getTitle())
+                    .description(material.getDescription())
+                    .status(material.getStatus())
+                    .version(material.getVersion())
+                    .createdAt(material.getCreatedAt())
+                    .updatedAt(material.getUpdatedAt())
+                    .build());
             return material;
         });
 
@@ -109,6 +120,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build());
 
         assertThat(materialId).isEqualTo(1000L);
+        assertThat(savedMaterials).hasSize(2);
+        assertThat(savedMaterials.getFirst().getMaterialNodeId()).isNull();
 
         var storageKeyCaptor = forClass(String.class);
         verify(storageRepositoryPort, times(4)).uploadObject(eq("toefl"), storageKeyCaptor.capture(), any());
@@ -124,25 +137,36 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .findFirst()
                 .orElseThrow();
 
+        assertThat(root.getMaterialId()).isEqualTo(materialId);
+        assertThat(savedMaterials.get(1).getMaterialNodeId()).isEqualTo(root.getId());
+
         MaterialNode part1 = savedNodes.stream()
                 .filter(node -> root.getId().equals(node.getParentNodeId()) && node.getDisplayOrder() == 0)
                 .findFirst()
                 .orElseThrow();
+
+        assertThat(part1.getMaterialId()).isEqualTo(materialId);
 
         MaterialNode part2 = savedNodes.stream()
                 .filter(node -> root.getId().equals(node.getParentNodeId()) && node.getDisplayOrder() == 1)
                 .findFirst()
                 .orElseThrow();
 
+        assertThat(part2.getMaterialId()).isEqualTo(materialId);
+
         List<MaterialNode> part1Questions = savedNodes.stream()
                 .filter(node -> part1.getId().equals(node.getParentNodeId()))
                 .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
                 .toList();
 
+        assertThat(part1Questions).extracting(MaterialNode::getMaterialId).containsOnly(materialId);
+
         List<MaterialNode> part2Questions = savedNodes.stream()
                 .filter(node -> part2.getId().equals(node.getParentNodeId()))
                 .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
                 .toList();
+
+        assertThat(part2Questions).extracting(MaterialNode::getMaterialId).containsOnly(materialId);
 
         assertThat(part1Questions)
                 .extracting(MaterialNode::getDisplayOrder, MaterialNode::getTranscriptText)

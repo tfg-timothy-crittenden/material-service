@@ -1,10 +1,20 @@
 -- Repeatable seed for 100 dummy TOEFL Speaking tests.
+--
 -- Each test contains:
 --   * 1 material row
 --   * 1 SECTION root node
 --   * 2 PART nodes
 --   * 11 ITEM question nodes (7 for Part 1, 4 for Part 2)
 --   * 12 assets (1 image + 11 audio files)
+--
+-- Important:
+-- Material is inserted first with material_node_id = NULL.
+-- Nodes can then reference their owning material through material_id.
+-- Once the root nodes exist, material.material_node_id is updated.
+
+-- ============================================================
+-- 1. MATERIALS
+-- ============================================================
 
 INSERT INTO material (
     id,
@@ -22,9 +32,13 @@ INSERT INTO material (
 SELECT
     10000 + n AS id,
     1 AS exam_family_id,
-    20000 + (n * 100) AS material_node_id,
+    NULL AS material_node_id,
     concat('TOEFL Speaking Test ', n) AS title,
-    concat('Dummy TOEFL speaking test #', n, ' generated for local database seeding.') AS description,
+    concat(
+            'Dummy TOEFL speaking test #',
+            n,
+            ' generated for local database seeding.'
+    ) AS description,
     NULL AS author_id,
     NULL AS owner_org_id,
     'PUBLISHED' AS status,
@@ -34,8 +48,14 @@ SELECT
 FROM generate_series(1, 100) AS gs(n)
 ON CONFLICT (id) DO NOTHING;
 
+
+-- ============================================================
+-- 2. ROOT SECTION NODES
+-- ============================================================
+
 INSERT INTO material_node (
     id,
+    material_id,
     parent_node_id,
     kind,
     title,
@@ -64,6 +84,7 @@ INSERT INTO material_node (
 )
 SELECT
     20000 + (n * 100) AS id,
+    10000 + n AS material_id,
     NULL AS parent_node_id,
     'SECTION' AS kind,
     concat('TOEFL Speaking Test ', n) AS title,
@@ -92,8 +113,32 @@ SELECT
 FROM generate_series(1, 100) AS gs(n)
 ON CONFLICT (id) DO NOTHING;
 
+
+-- ============================================================
+-- 3. CONNECT EACH MATERIAL TO ITS ROOT NODE
+-- ============================================================
+
+UPDATE material m
+SET
+    material_node_id = roots.root_id,
+    updated_at = now()
+FROM (
+         SELECT
+             10000 + n AS material_id,
+             20000 + (n * 100) AS root_id
+         FROM generate_series(1, 100) AS gs(n)
+     ) AS roots
+WHERE m.id = roots.material_id
+  AND m.material_node_id IS DISTINCT FROM roots.root_id;
+
+
+-- ============================================================
+-- 4. PART 1 NODES
+-- ============================================================
+
 INSERT INTO material_node (
     id,
+    material_id,
     parent_node_id,
     kind,
     title,
@@ -122,6 +167,7 @@ INSERT INTO material_node (
 )
 SELECT
     root_id + 1 AS id,
+    material_id,
     root_id AS parent_node_id,
     'PART' AS kind,
     'Part 1' AS title,
@@ -148,13 +194,21 @@ SELECT
     now() AS created_at,
     now() AS updated_at
 FROM (
-    SELECT 20000 + (n * 100) AS root_id
-    FROM generate_series(1, 100) AS gs(n)
-) AS roots
+         SELECT
+             10000 + n AS material_id,
+             20000 + (n * 100) AS root_id
+         FROM generate_series(1, 100) AS gs(n)
+     ) AS roots
 ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================
+-- 5. PART 2 NODES
+-- ============================================================
 
 INSERT INTO material_node (
     id,
+    material_id,
     parent_node_id,
     kind,
     title,
@@ -183,6 +237,7 @@ INSERT INTO material_node (
 )
 SELECT
     root_id + 2 AS id,
+    material_id,
     root_id AS parent_node_id,
     'PART' AS kind,
     'Part 2' AS title,
@@ -209,13 +264,22 @@ SELECT
     now() AS created_at,
     now() AS updated_at
 FROM (
-    SELECT 20000 + (n * 100) AS root_id
-    FROM generate_series(1, 100) AS gs(n)
-) AS roots
+         SELECT
+             10000 + n AS material_id,
+             20000 + (n * 100) AS root_id
+         FROM generate_series(1, 100) AS gs(n)
+     ) AS roots
 ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================
+-- 6. PART 1 QUESTIONS
+--    7 questions per test
+-- ============================================================
 
 INSERT INTO material_node (
     id,
+    material_id,
     parent_node_id,
     kind,
     title,
@@ -244,6 +308,7 @@ INSERT INTO material_node (
 )
 SELECT
     root_id + 10 + question_offset AS id,
+    material_id,
     root_id + 1 AS parent_node_id,
     'ITEM' AS kind,
     concat('Question ', question_offset + 1) AS title,
@@ -252,7 +317,13 @@ SELECT
     NULL AS task_type_id,
     NULL AS instructions,
     NULL AS stimulus_text,
-    concat('Dummy Part 1 transcript for test ', test_number, ', question ', question_offset + 1, '.') AS transcript_text,
+    concat(
+            'Dummy Part 1 transcript for test ',
+            test_number,
+            ', question ',
+            question_offset + 1,
+            '.'
+    ) AS transcript_text,
     NULL AS explanation_text,
     60 AS time_limit_seconds,
     15 AS prep_time_seconds,
@@ -265,22 +336,35 @@ SELECT
     'NONE' AS scoring_mode,
     NULL AS max_score,
     NULL AS passing_score,
-    jsonb_build_object('dummy', true, 'testNumber', test_number, 'part', 1, 'question', question_offset + 1) AS config,
+    jsonb_build_object(
+            'dummy', true,
+            'testNumber', test_number,
+            'part', 1,
+            'question', question_offset + 1
+    ) AS config,
     0 AS version,
     now() AS created_at,
     now() AS updated_at
 FROM (
-    SELECT
-        n AS test_number,
-        20000 + (n * 100) AS root_id,
-        q AS question_offset
-    FROM generate_series(1, 100) AS tests(n)
-    CROSS JOIN generate_series(0, 6) AS questions(q)
-) AS part1_questions
+         SELECT
+             n AS test_number,
+             10000 + n AS material_id,
+             20000 + (n * 100) AS root_id,
+             q AS question_offset
+         FROM generate_series(1, 100) AS tests(n)
+                  CROSS JOIN generate_series(0, 6) AS questions(q)
+     ) AS part1_questions
 ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================
+-- 7. PART 2 QUESTIONS
+--    4 questions per test
+-- ============================================================
 
 INSERT INTO material_node (
     id,
+    material_id,
     parent_node_id,
     kind,
     title,
@@ -309,6 +393,7 @@ INSERT INTO material_node (
 )
 SELECT
     root_id + 20 + question_offset AS id,
+    material_id,
     root_id + 2 AS parent_node_id,
     'ITEM' AS kind,
     concat('Question ', question_offset + 1) AS title,
@@ -317,7 +402,13 @@ SELECT
     NULL AS task_type_id,
     NULL AS instructions,
     NULL AS stimulus_text,
-    concat('Dummy Part 2 transcript for test ', test_number, ', question ', question_offset + 1, '.') AS transcript_text,
+    concat(
+            'Dummy Part 2 transcript for test ',
+            test_number,
+            ', question ',
+            question_offset + 1,
+            '.'
+    ) AS transcript_text,
     NULL AS explanation_text,
     60 AS time_limit_seconds,
     15 AS prep_time_seconds,
@@ -330,19 +421,31 @@ SELECT
     'NONE' AS scoring_mode,
     NULL AS max_score,
     NULL AS passing_score,
-    jsonb_build_object('dummy', true, 'testNumber', test_number, 'part', 2, 'question', question_offset + 1) AS config,
+    jsonb_build_object(
+            'dummy', true,
+            'testNumber', test_number,
+            'part', 2,
+            'question', question_offset + 1
+    ) AS config,
     0 AS version,
     now() AS created_at,
     now() AS updated_at
 FROM (
-    SELECT
-        n AS test_number,
-        20000 + (n * 100) AS root_id,
-        q AS question_offset
-    FROM generate_series(1, 100) AS tests(n)
-    CROSS JOIN generate_series(0, 3) AS questions(q)
-) AS part2_questions
+         SELECT
+             n AS test_number,
+             10000 + n AS material_id,
+             20000 + (n * 100) AS root_id,
+             q AS question_offset
+         FROM generate_series(1, 100) AS tests(n)
+                  CROSS JOIN generate_series(0, 3) AS questions(q)
+     ) AS part2_questions
 ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================
+-- 8. PART 1 IMAGE ASSETS
+--    1 image per test
+-- ============================================================
 
 INSERT INTO material_asset (
     id,
@@ -364,7 +467,11 @@ SELECT
     40000 + n AS id,
     20000 + (n * 100) + 1 AS material_node_id,
     'IMAGE' AS kind,
-    concat('speaking/', 10000 + n, '/part1/image/image.png') AS storage_key,
+    concat(
+            'speaking/',
+            10000 + n,
+            '/part1/image/image.png'
+    ) AS storage_key,
     concat('part1-', n, '.png') AS original_filename,
     'image/png' AS mime_type,
     1 AS file_size_bytes,
@@ -377,6 +484,12 @@ SELECT
     now() AS updated_at
 FROM generate_series(1, 100) AS gs(n)
 ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================
+-- 9. QUESTION AUDIO ASSETS
+--    7 Part 1 + 4 Part 2 audio assets per test
+-- ============================================================
 
 INSERT INTO material_asset (
     id,
@@ -395,37 +508,79 @@ INSERT INTO material_asset (
     updated_at
 )
 SELECT
-    41000 + (test_number * 100) + (part_number * 10) + question_number AS id,
-    CASE WHEN part_number = 1 THEN root_id + 10 + (question_number - 1) ELSE root_id + 20 + (question_number - 1) END AS material_node_id,
+    41000
+        + (test_number * 100)
+        + (part_number * 10)
+        + question_number AS id,
+
+    CASE
+        WHEN part_number = 1
+            THEN root_id + 10 + (question_number - 1)
+        ELSE
+            root_id + 20 + (question_number - 1)
+        END AS material_node_id,
+
     'AUDIO' AS kind,
-    concat('speaking/', 10000 + test_number, '/part', part_number, '/audio/question_', question_number, '.mp3') AS storage_key,
-    concat('question-', test_number, '-', part_number, '-', question_number, '.mp3') AS original_filename,
+
+    concat(
+            'speaking/',
+            10000 + test_number,
+            '/part',
+            part_number,
+            '/audio/question_',
+            question_number,
+            '.mp3'
+    ) AS storage_key,
+
+    concat(
+            'question-',
+            test_number,
+            '-',
+            part_number,
+            '-',
+            question_number,
+            '.mp3'
+    ) AS original_filename,
+
     'audio/mpeg' AS mime_type,
     1 AS file_size_bytes,
-    concat('Question ', question_number, ' audio') AS title,
+
+    concat(
+            'Question ',
+            question_number,
+            ' audio'
+    ) AS title,
+
     NULL AS transcript_text,
     0 AS display_order,
-    jsonb_build_object('dummy', true, 'testNumber', test_number, 'part', part_number, 'question', question_number) AS metadata,
+
+    jsonb_build_object(
+            'dummy', true,
+            'testNumber', test_number,
+            'part', part_number,
+            'question', question_number
+    ) AS metadata,
+
     0 AS version,
     now() AS created_at,
     now() AS updated_at
 FROM (
-    SELECT
-        n AS test_number,
-        20000 + (n * 100) AS root_id,
-        1 AS part_number,
-        q AS question_number
-    FROM generate_series(1, 100) AS tests(n)
-    CROSS JOIN generate_series(1, 7) AS questions(q)
+         SELECT
+             n AS test_number,
+             20000 + (n * 100) AS root_id,
+             1 AS part_number,
+             q AS question_number
+         FROM generate_series(1, 100) AS tests(n)
+                  CROSS JOIN generate_series(1, 7) AS questions(q)
 
-    UNION ALL
+         UNION ALL
 
-    SELECT
-        n AS test_number,
-        20000 + (n * 100) AS root_id,
-        2 AS part_number,
-        q AS question_number
-    FROM generate_series(1, 100) AS tests(n)
-    CROSS JOIN generate_series(1, 4) AS questions(q)
-) AS audio_rows
+         SELECT
+             n AS test_number,
+             20000 + (n * 100) AS root_id,
+             2 AS part_number,
+             q AS question_number
+         FROM generate_series(1, 100) AS tests(n)
+                  CROSS JOIN generate_series(1, 4) AS questions(q)
+     ) AS audio_rows
 ON CONFLICT (id) DO NOTHING;

@@ -23,4 +23,6 @@ public interface MaterialNodeJpaRepository extends JpaRepository<MaterialNodeJpa
     List<MaterialNodeJpaEntity> findByKindAndExamFamilyIdAndSkillId(@Param("kind") String kind, @Param("examFamilyId") Long examFamilyId, @Param("skillId") Long skillId);
 
     Optional<MaterialNodeJpaEntity> findByParentNodeIdAndDisplayOrder(Long parentNodeId, Integer displayOrder);
+
+    List<MaterialNodeJpaEntity> findByMaterialId(Long materialId);
 }

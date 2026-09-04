@@ -58,18 +58,20 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 ? command.getMaterialTitle()
                 : "Untitled Draft";
 
-        MaterialNode savedRootNode = createSectionRoot(effectiveTitle);
-        Material savedMaterial = createMaterial(effectiveTitle, command.getMaterialDescription(), savedRootNode.getId());
+        Material savedMaterial = createMaterial(effectiveTitle, command.getMaterialDescription());
+        MaterialNode savedRootNode = createSectionRoot(savedMaterial.getId(), effectiveTitle);
+        savedMaterial.setMaterialNodeId(savedRootNode.getId());
+        materialRepository.save(savedMaterial);
 
         // Always create Part 1 and Part 2 to scaffold the full tree structure.
-        MaterialNode part1Node = createPartNode(savedRootNode.getId(), command.getPartTitle(), 0);
+        MaterialNode part1Node = createPartNode(savedMaterial.getId(), savedRootNode.getId(), command.getPartTitle(), 0);
         saveImageAsset(command.getPartImage(), savedMaterial.getId(), part1Node.getId());
         createQuestions(savedMaterial.getId(), part1Node.getId(), command.getQuestions(), 1);
-        createMissingPlaceholderQuestions(part1Node.getId(), safeSize(command.getQuestions()), PART_1_QUESTION_COUNT);
+        createMissingPlaceholderQuestions(savedMaterial.getId(), part1Node.getId(), safeSize(command.getQuestions()), PART_1_QUESTION_COUNT);
 
-        MaterialNode part2Node = createPartNode(savedRootNode.getId(), command.getPart2Title(), 1);
+        MaterialNode part2Node = createPartNode(savedMaterial.getId(), savedRootNode.getId(), command.getPart2Title(), 1);
         createQuestions(savedMaterial.getId(), part2Node.getId(), command.getPart2Questions(), 2);
-        createMissingPlaceholderQuestions(part2Node.getId(), safeSize(command.getPart2Questions()), PART_2_QUESTION_COUNT);
+        createMissingPlaceholderQuestions(savedMaterial.getId(), part2Node.getId(), safeSize(command.getPart2Questions()), PART_2_QUESTION_COUNT);
 
         return savedMaterial.getId();
     }
@@ -200,10 +202,11 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     }
 
 
-    private MaterialNode createSectionRoot(String sectionTitle) {
+    private MaterialNode createSectionRoot(Long materialId, String sectionTitle) {
         Instant now = Instant.now();
         MaterialNode sectionNode = MaterialNode.builder()
                 .id(null)
+                .materialId(materialId)
                 .parentNodeId(null)
                 .kind("SECTION")
                 .title(sectionTitle)
@@ -220,12 +223,12 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         return materialNodeRepository.save(sectionNode);
     }
 
-    private Material createMaterial(String materialTitle, String materialDescription, Long rootNodeId) {
+    private Material createMaterial(String materialTitle, String materialDescription) {
         Instant now = Instant.now();
         Material material = Material.builder()
                 .id(null)
                 .examFamilyId(TOEFL_EXAM_FAMILY_ID)
-                .materialNodeId(rootNodeId)
+                .materialNodeId(null)
                 .title(materialTitle)
                 .description(materialDescription)
                 .authorId(null)
@@ -238,10 +241,11 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         return materialRepository.save(material);
     }
 
-    private MaterialNode createPartNode(Long parentNodeId, String title, int displayOrder) {
+    private MaterialNode createPartNode(Long materialId, Long parentNodeId, String title, int displayOrder) {
         Instant now = Instant.now();
         MaterialNode partNode = MaterialNode.builder()
                 .id(null)
+                .materialId(materialId)
                 .parentNodeId(parentNodeId)
                 .kind("PART")
                 .title(title)
@@ -306,6 +310,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             String title = "Question " + (questionOrder + 1);
             MaterialNode questionNode = MaterialNode.builder()
                     .id(null)
+                    .materialId(materialId)
                     .parentNodeId(partNodeId)
                     .kind("ITEM")
                     .title(title)
@@ -331,12 +336,13 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
      * Creates any missing placeholder question nodes needed to scaffold the expected tree structure.
      * These questions have no transcript text, config, or audio—they can be filled in later via PATCH.
      */
-    private void createMissingPlaceholderQuestions(Long partNodeId, int existingQuestionCount, int expectedQuestionCount) {
+    private void createMissingPlaceholderQuestions(Long materialId, Long partNodeId, int existingQuestionCount, int expectedQuestionCount) {
         Instant now = Instant.now();
         for (int i = existingQuestionCount; i < expectedQuestionCount; i++) {
             String title = "Question " + (i + 1);
             MaterialNode questionNode = MaterialNode.builder()
                     .id(null)
+                    .materialId(materialId)
                     .parentNodeId(partNodeId)
                     .kind("ITEM")
                     .title(title)

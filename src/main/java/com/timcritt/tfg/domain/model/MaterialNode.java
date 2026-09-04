@@ -12,7 +12,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class MaterialNode {
     private Long id;
-    private Long materialVersionId;
+    private Long materialId;
     private Long parentNodeId;
     private String kind;
     private String title;

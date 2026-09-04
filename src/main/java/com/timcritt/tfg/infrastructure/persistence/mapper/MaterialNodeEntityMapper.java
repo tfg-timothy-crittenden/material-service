@@ -8,7 +8,7 @@ public class MaterialNodeEntityMapper {
         if (entity == null) return null;
         return MaterialNode.builder()
                 .id(entity.getId())
-                .materialVersionId(null)
+                .materialId(null)
                 .parentNodeId(entity.getParentNodeId())
                 .kind(entity.getKind())
                 .title(entity.getTitle())
@@ -41,6 +41,7 @@ public class MaterialNodeEntityMapper {
         if (domain == null) return null;
         return MaterialNodeJpaEntity.builder()
                 .id(domain.getId())
+                .materialId(domain.getMaterialId())
                 .parentNodeId(domain.getParentNodeId())
                 .kind(domain.getKind())
                 .title(domain.getTitle())
