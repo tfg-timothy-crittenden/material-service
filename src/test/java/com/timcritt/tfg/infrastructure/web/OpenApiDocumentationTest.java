@@ -24,12 +24,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.flyway.enabled=false",
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.kafka.listener.auto-startup=false",
+        "material.kafka.outbox-relay.enabled=false",
         "authorization.classroom.enabled=false",
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
         "authorization.classroom.transport=http"
 })
-@TestPropertySource(properties = "authorization.classroom.enabled=false")
+@TestPropertySource(properties = {"authorization.classroom.enabled=false", "material.kafka.outbox-relay.enabled=false"})
 @AutoConfigureMockMvc
 class OpenApiDocumentationTest {
 

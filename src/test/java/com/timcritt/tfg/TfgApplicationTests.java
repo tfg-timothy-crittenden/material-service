@@ -15,6 +15,7 @@ import org.springframework.test.context.TestPropertySource;
           // No schema creation is needed for this smoke test
           "spring.jpa.hibernate.ddl-auto=none",
         "spring.kafka.listener.auto-startup=false",
+        "material.kafka.outbox-relay.enabled=false",
         "authorization.classroom.enabled=false",
         // Disable trying to contact cloud config
           "spring.cloud.config.enabled=false",
@@ -23,7 +24,7 @@ import org.springframework.test.context.TestPropertySource;
           // Disable gRPC transport so ClassroomAuthorizationGrpcConfig is not loaded
           "authorization.classroom.transport=http"
 })
-    @TestPropertySource(properties = "authorization.classroom.enabled=false")
+        @TestPropertySource(properties = {"authorization.classroom.enabled=false", "material.kafka.outbox-relay.enabled=false"})
 class TfgApplicationTests {
 
 

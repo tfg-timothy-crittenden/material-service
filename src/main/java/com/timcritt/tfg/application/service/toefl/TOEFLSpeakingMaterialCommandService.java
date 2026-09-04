@@ -5,31 +5,23 @@ import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateComma
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
+import com.timcritt.tfg.application.port.outbound.*;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
-import com.timcritt.tfg.application.port.outbound.MaterialDeletionEventPublisherPort;
-import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
-import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
-import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.MaterialNode;
 import com.timcritt.tfg.domain.model.MaterialStatus;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
-import java.util.ArrayDeque;
+import java.util.*;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+
+import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DETAILS_UPSERTED;
+import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DELETED;
 
 public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMaterialCommandUseCase {
     private static final Long TOEFL_SKILL_ID = 4L;
@@ -41,22 +33,19 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     private final MaterialNodeRepositoryPort materialNodeRepository;
     private final MaterialAssetRepositoryPort materialAssetRepository;
     private final StorageRepositoryPort storageRepositoryPort;
-    private final MaterialDeletionEventPublisherPort deletionEventPublisher;
-    private final MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher;
+    private final IntegrationEventOutboxPort outboxPort;
 
     public TOEFLSpeakingMaterialCommandService(
             MaterialRepositoryPort materialRepository,
             MaterialNodeRepositoryPort materialNodeRepository,
             MaterialAssetRepositoryPort materialAssetRepository,
             StorageRepositoryPort storageRepositoryPort,
-            MaterialDeletionEventPublisherPort deletionEventPublisher,
-            MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher) {
+            IntegrationEventOutboxPort outboxPort) {
         this.materialRepository = materialRepository;
         this.materialNodeRepository = materialNodeRepository;
         this.materialAssetRepository = materialAssetRepository;
         this.storageRepositoryPort = storageRepositoryPort;
-        this.deletionEventPublisher = deletionEventPublisher;
-        this.detailsUpsertedEventPublisher = detailsUpsertedEventPublisher;
+        this.outboxPort = outboxPort;
     }
 
     @Override
@@ -71,11 +60,11 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 : "Untitled Draft";
 
         MaterialNode savedRootNode = createSectionRoot(effectiveTitle);
-        Material savedMaterial = createMaterial(effectiveTitle, command.getMaterialDescription(), savedRootNode.getId(), MaterialStatus.DRAFT);
+        Material savedMaterial = createMaterial(effectiveTitle, command.getMaterialDescription(), savedRootNode.getId());
 
         // Always create Part 1 and Part 2 to scaffold the full tree structure.
         MaterialNode part1Node = createPartNode(savedRootNode.getId(), command.getPartTitle(), 0);
-        saveImageAsset(command.getPartImage(), savedMaterial.getId(), part1Node.getId(), 1);
+        saveImageAsset(command.getPartImage(), savedMaterial.getId(), part1Node.getId());
         createQuestions(savedMaterial.getId(), part1Node.getId(), command.getQuestions(), 1);
         createMissingPlaceholderQuestions(part1Node.getId(), safeSize(command.getQuestions()), PART_1_QUESTION_COUNT);
 
@@ -197,32 +186,20 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
         materialRepository.delete(materialId);
 
-        deletionEventPublisher.publishMaterialDeleted(MaterialDeletedEvent.builder()
-                .materialId(materialId)
-                .rootNodeId(rootNodeId)
-                .deletedAt(Instant.now())
-                .build());
+        Instant deletedAt = Instant.now();
+        outboxPort.append(
+                UUID.randomUUID(),
+                "Material",
+                material.getId().toString(),
+                MATERIAL_DELETED,
+                MaterialDeletedEvent.builder()
+                        .materialId(materialId)
+                        .rootNodeId(rootNodeId)
+                        .deletedAt(deletedAt)
+                        .build()
+        );
     }
 
-
-    private void validateQuestions(List<SpeakingQuestionUploadCommand> questions, String fieldName, boolean requireConfig) {
-        for (int i = 0; i < questions.size(); i++) {
-            SpeakingQuestionUploadCommand question = questions.get(i);
-            if (question == null) {
-                throw new IllegalArgumentException(fieldName + "[" + i + "] is required");
-            }
-            if (!hasText(question.getTranscriptText())) {
-                throw new IllegalArgumentException(fieldName + "[" + i + "].transcriptText is required");
-            }
-            UploadedFileCommand audio = question.getAudio();
-            if (audio == null || audio.getBytes() == null || audio.getBytes().length == 0) {
-                throw new IllegalArgumentException("Audio file is required for question index " + i);
-            }
-            if (requireConfig && question.getConfig() == null) {
-                throw new IllegalArgumentException(fieldName + "[" + i + "].config is required");
-            }
-        }
-    }
 
     private MaterialNode createSectionRoot(String sectionTitle) {
         Instant now = Instant.now();
@@ -244,7 +221,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         return materialNodeRepository.save(sectionNode);
     }
 
-    private Material createMaterial(String materialTitle, String materialDescription, Long rootNodeId, MaterialStatus status) {
+    private Material createMaterial(String materialTitle, String materialDescription, Long rootNodeId) {
         Instant now = Instant.now();
         Material material = Material.builder()
                 .id(null)
@@ -254,7 +231,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 .description(materialDescription)
                 .authorId(null)
                 .ownerOrgId(null)
-                .status(status)
+                .status(MaterialStatus.DRAFT)
                 .version(0L)
                 .createdAt(now)
                 .updatedAt(now)
@@ -282,9 +259,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         return materialNodeRepository.save(partNode);
     }
 
-    private void saveImageAsset(UploadedFileCommand image, Long materialId, Long materialNodeId, int partNumber) {
+    private void saveImageAsset(UploadedFileCommand image, Long materialId, Long materialNodeId) {
         saveAsset(image, materialNodeId, MaterialAsset.Kind.IMAGE,
-                buildSpeakingStorageKey(materialId, partNumber, MaterialAsset.Kind.IMAGE, null));
+                buildSpeakingStorageKey(materialId, 1, MaterialAsset.Kind.IMAGE, null));
     }
 
     private void saveAudioAsset(UploadedFileCommand audio, Long materialId, Long materialNodeId, int partNumber, int questionNumber) {
@@ -408,6 +385,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     }
 
     @Override
+    @Transactional
     public void updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand command) {
         if (command == null || command.getMaterialId() == null) {
             throw new IllegalArgumentException("materialId is required");
@@ -416,7 +394,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         // Track newly uploaded storage keys so we can delete them on failure (compensation).
         List<String> uploadedKeys = new ArrayList<>();
         Set<String> storageKeysBeforeUpdate = Set.of();
-        Set<String> storageKeysAfterUpdate = Set.of();
+        Set<String> storageKeysAfterUpdate;
         Material material;
         MaterialNode rootNode;
         boolean materialDirty = false;
@@ -542,7 +520,8 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         }
 
         if (titlesChanged) {
-            detailsUpsertedEventPublisher.publishMaterialDetailsUpserted(MaterialDetailsUpsertedEvent.builder()
+
+            MaterialDetailsUpsertedEvent event = MaterialDetailsUpsertedEvent.builder()
                     .materialId(command.getMaterialId())
                     .version(material.getVersion())
                     .materialTitle(material.getTitle())
@@ -550,7 +529,15 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                     .part2Title(resolvePartTitle(rootNode.getId(), 1))
                     .description(material.getDescription())
                     .updatedAt(Instant.now())
-                    .build(), null);
+                    .build();
+
+            outboxPort.append(
+                    UUID.randomUUID(),
+                    "Material",
+                    material.getId().toString(),
+                    MATERIAL_DETAILS_UPSERTED,
+                    event
+            );
         }
     }
 

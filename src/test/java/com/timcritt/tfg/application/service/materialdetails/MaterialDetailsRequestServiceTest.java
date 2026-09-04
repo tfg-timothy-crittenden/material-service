@@ -1,8 +1,9 @@
 package com.timcritt.tfg.application.service.materialdetails;
 
 import com.timcritt.tfg.application.dto.SpeakingSectionEditResult;
+import com.timcritt.tfg.application.integration.MaterialDetailsUpsertedOutboxMessage;
+import com.timcritt.tfg.application.port.outbound.IntegrationEventOutboxPort;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
-import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
 import com.timcritt.tfg.domain.event.MaterialDetailsRequestedPayload;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -25,12 +27,12 @@ class MaterialDetailsRequestServiceTest {
 
     private final MaterialRepositoryPort materialRepository = mock(MaterialRepositoryPort.class);
     private final TOEFLSpeakingNavigationUseCase navigationUseCase = mock(TOEFLSpeakingNavigationUseCase.class);
-    private final MaterialDetailsUpsertedEventPublisherPort eventPublisher = mock(MaterialDetailsUpsertedEventPublisherPort.class);
+    private final IntegrationEventOutboxPort outboxPort = mock(IntegrationEventOutboxPort.class);
 
     private final MaterialDetailsRequestService service = new MaterialDetailsRequestService(
             materialRepository,
             navigationUseCase,
-            eventPublisher
+            outboxPort
     );
 
     @Test
@@ -50,28 +52,42 @@ class MaterialDetailsRequestServiceTest {
                 .materialIds(List.of(10L, 20L, 30L))
                 .build())).doesNotThrowAnyException();
 
-        org.mockito.ArgumentCaptor<MaterialDetailsUpsertedEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(MaterialDetailsUpsertedEvent.class);
-        org.mockito.ArgumentCaptor<String> requestIdCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(eventPublisher, times(2)).publishMaterialDetailsUpserted(eventCaptor.capture(), requestIdCaptor.capture());
+        org.mockito.ArgumentCaptor<UUID> eventIdCaptor = org.mockito.ArgumentCaptor.forClass(UUID.class);
+        org.mockito.ArgumentCaptor<String> aggregateTypeCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<String> aggregateIdCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<String> eventTypeCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<MaterialDetailsUpsertedOutboxMessage> payloadCaptor = org.mockito.ArgumentCaptor.forClass(MaterialDetailsUpsertedOutboxMessage.class);
+        verify(outboxPort, times(2)).append(
+                eventIdCaptor.capture(),
+                aggregateTypeCaptor.capture(),
+                aggregateIdCaptor.capture(),
+                eventTypeCaptor.capture(),
+                payloadCaptor.capture());
 
-        assertThat(requestIdCaptor.getAllValues()).containsExactly("req-1", "req-1");
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getMaterialId)
+        assertThat(eventIdCaptor.getAllValues()).allMatch(java.util.Objects::nonNull);
+        assertThat(aggregateTypeCaptor.getAllValues()).containsExactly("Material", "Material");
+        assertThat(aggregateIdCaptor.getAllValues()).containsExactly("10", "30");
+        assertThat(eventTypeCaptor.getAllValues()).containsExactly("material.details.upserted.v1", "material.details.upserted.v1");
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(MaterialDetailsUpsertedOutboxMessage::getRequestId)
+                .containsExactly("req-1", "req-1");
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(payload -> payload.getEvent().getMaterialId())
                 .containsExactly(10L, 30L);
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getVersion)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(payload -> payload.getEvent().getVersion())
                 .containsExactly(3L, 7L);
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getMaterialTitle)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(payload -> payload.getEvent().getMaterialTitle())
                 .containsExactly("Material 10", "Material 30");
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getPart1Title)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(payload -> payload.getEvent().getPart1Title())
                 .containsExactly("Part 1 A", "Part 1 B");
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getPart2Title)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(payload -> payload.getEvent().getPart2Title())
                 .containsExactly("Part 2 A", "Part 2 B");
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getDescription)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(payload -> payload.getEvent().getDescription())
                 .containsExactly("Desc 10", "Desc 30");
     }
 
@@ -88,11 +104,11 @@ class MaterialDetailsRequestServiceTest {
                 .requestedAt(Instant.parse("2026-09-01T18:00:00Z"))
                 .build());
 
-        org.mockito.ArgumentCaptor<MaterialDetailsUpsertedEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(MaterialDetailsUpsertedEvent.class);
-        org.mockito.ArgumentCaptor<String> requestIdCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(eventPublisher, times(1)).publishMaterialDetailsUpserted(eventCaptor.capture(), requestIdCaptor.capture());
+        org.mockito.ArgumentCaptor<MaterialDetailsUpsertedOutboxMessage> payloadCaptor = org.mockito.ArgumentCaptor.forClass(MaterialDetailsUpsertedOutboxMessage.class);
+        verify(outboxPort, times(1)).append(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("Material"), org.mockito.ArgumentMatchers.eq("10"), org.mockito.ArgumentMatchers.eq("material.details.upserted.v1"), payloadCaptor.capture());
 
-        assertThat(eventCaptor.getValue().getVersion()).isEqualTo(0L);
+        assertThat(payloadCaptor.getValue().getRequestId()).isEqualTo("req-1");
+        assertThat(payloadCaptor.getValue().getEvent().getVersion()).isEqualTo(0L);
     }
 
     @Test
@@ -108,14 +124,14 @@ class MaterialDetailsRequestServiceTest {
                 .requestedAt(Instant.parse("2026-09-01T18:00:00Z"))
                 .build());
 
-        org.mockito.ArgumentCaptor<MaterialDetailsUpsertedEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(MaterialDetailsUpsertedEvent.class);
-        org.mockito.ArgumentCaptor<String> requestIdCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(eventPublisher, times(1)).publishMaterialDetailsUpserted(eventCaptor.capture(), requestIdCaptor.capture());
+        org.mockito.ArgumentCaptor<MaterialDetailsUpsertedOutboxMessage> payloadCaptor = org.mockito.ArgumentCaptor.forClass(MaterialDetailsUpsertedOutboxMessage.class);
+        verify(outboxPort, times(1)).append(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("Material"), org.mockito.ArgumentMatchers.eq("10"), org.mockito.ArgumentMatchers.eq("material.details.upserted.v1"), payloadCaptor.capture());
 
-        assertThat(eventCaptor.getValue().getMaterialTitle()).isEqualTo("Section 10");
-        assertThat(eventCaptor.getValue().getPart1Title()).isNull();
-        assertThat(eventCaptor.getValue().getPart2Title()).isNull();
-        assertThat(eventCaptor.getValue().getDescription()).isEqualTo("Desc 10");
+        assertThat(payloadCaptor.getValue().getRequestId()).isEqualTo("req-1");
+        assertThat(payloadCaptor.getValue().getEvent().getMaterialTitle()).isEqualTo("Section 10");
+        assertThat(payloadCaptor.getValue().getEvent().getPart1Title()).isNull();
+        assertThat(payloadCaptor.getValue().getEvent().getPart2Title()).isNull();
+        assertThat(payloadCaptor.getValue().getEvent().getDescription()).isEqualTo("Desc 10");
     }
 
     private static Material material(Long id, Long version, String title, String description, Instant updatedAt) {

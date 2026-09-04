@@ -1,11 +1,12 @@
 package com.timcritt.tfg.application.service.materialdetails;
 
 import com.timcritt.tfg.application.dto.SpeakingSectionEditResult;
-import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
+import com.timcritt.tfg.application.integration.MaterialDetailsUpsertedOutboxMessage;
+import com.timcritt.tfg.application.port.outbound.IntegrationEventOutboxPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
-import com.timcritt.tfg.domain.event.MaterialDetailsRequestedPayload;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
+import com.timcritt.tfg.domain.event.MaterialDetailsRequestedPayload;
 import com.timcritt.tfg.domain.model.Material;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,9 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+
+import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DETAILS_UPSERTED;
 
 @Service
 @Slf4j
@@ -21,15 +25,15 @@ public class MaterialDetailsRequestService {
 
     private final MaterialRepositoryPort materialRepository;
     private final TOEFLSpeakingNavigationUseCase navigationUseCase;
-    private final MaterialDetailsUpsertedEventPublisherPort eventPublisher;
+    private final IntegrationEventOutboxPort outboxPort;
 
     public MaterialDetailsRequestService(
             MaterialRepositoryPort materialRepository,
             TOEFLSpeakingNavigationUseCase navigationUseCase,
-            MaterialDetailsUpsertedEventPublisherPort eventPublisher) {
+            IntegrationEventOutboxPort outboxPort) {
         this.materialRepository = materialRepository;
         this.navigationUseCase = navigationUseCase;
-        this.eventPublisher = eventPublisher;
+        this.outboxPort = outboxPort;
     }
 
     public void processRequest(MaterialDetailsRequestedPayload request) {
@@ -65,17 +69,25 @@ public class MaterialDetailsRequestService {
                 log.warn("Publishing fallback material details for material without speaking edit view: requestId={}, materialId={}", requestId, materialId);
             }
             SpeakingSectionEditResult details = detailsOpt.orElse(null);
-            eventPublisher.publishMaterialDetailsUpserted(
-                    MaterialDetailsUpsertedEvent.builder()
-                            .materialId(material.getId())
-                            .version(resolveVersion(material))
-                            .materialTitle(resolveMaterialTitle(material, details))
-                            .part1Title(details == null ? null : details.getPartTitle())
-                            .part2Title(details == null ? null : details.getPart2Title())
-                            .description(resolveDescription(material, details))
-                            .updatedAt(resolveUpdatedAt(material))
-                            .build(),
-                    requestId);
+            MaterialDetailsUpsertedEvent event = MaterialDetailsUpsertedEvent.builder()
+                    .materialId(material.getId())
+                    .version(resolveVersion(material))
+                    .materialTitle(resolveMaterialTitle(material, details))
+                    .part1Title(details == null ? null : details.getPartTitle())
+                    .part2Title(details == null ? null : details.getPart2Title())
+                    .description(resolveDescription(material, details))
+                    .updatedAt(resolveUpdatedAt(material))
+                    .build();
+
+            outboxPort.append(
+                    UUID.randomUUID(),
+                    "Material",
+                    material.getId().toString(),
+                    MATERIAL_DETAILS_UPSERTED,
+                    MaterialDetailsUpsertedOutboxMessage.builder()
+                            .requestId(requestId)
+                            .event(event)
+                            .build());
         }
     }
 
