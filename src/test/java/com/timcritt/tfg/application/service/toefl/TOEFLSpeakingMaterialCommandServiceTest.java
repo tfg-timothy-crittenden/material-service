@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DETAILS_UPSERTED;
+import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DELETED;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,8 +40,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     private final MaterialNodeRepositoryPort materialNodeRepository = mock(MaterialNodeRepositoryPort.class);
     private final MaterialAssetRepositoryPort materialAssetRepository = mock(MaterialAssetRepositoryPort.class);
     private final StorageRepositoryPort storageRepositoryPort = mock(StorageRepositoryPort.class);
-    private final MaterialDeletionEventPublisherPort deletionEventPublisher = mock(MaterialDeletionEventPublisherPort.class);
-    private final MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher = mock(MaterialDetailsUpsertedEventPublisherPort.class);
     private final IntegrationEventOutboxPort outboxPort = mock(IntegrationEventOutboxPort.class);
 
     private final TOEFLSpeakingMaterialCommandService service = new TOEFLSpeakingMaterialCommandService(
@@ -47,8 +47,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
             materialNodeRepository,
             materialAssetRepository,
             storageRepositoryPort,
-            deletionEventPublisher,
-            detailsUpsertedEventPublisher,
             outboxPort
     );
 
@@ -208,7 +206,27 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         verify(materialRepository, times(1)).delete(materialId);
         verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/root-audio.mp3");
         verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/child-audio.mp3");
-        verify(deletionEventPublisher, times(1)).publishMaterialDeleted(any(MaterialDeletedEvent.class));
+
+        var eventIdCaptor = forClass(java.util.UUID.class);
+        var aggregateTypeCaptor = forClass(String.class);
+        var aggregateIdCaptor = forClass(String.class);
+        var eventTypeCaptor = forClass(String.class);
+        var payloadCaptor = forClass(MaterialDeletedEvent.class);
+
+        verify(outboxPort, times(1)).append(
+                eventIdCaptor.capture(),
+                aggregateTypeCaptor.capture(),
+                aggregateIdCaptor.capture(),
+                eventTypeCaptor.capture(),
+                payloadCaptor.capture());
+
+        assertThat(eventIdCaptor.getValue()).isNotNull();
+        assertThat(aggregateTypeCaptor.getValue()).isEqualTo("Material");
+        assertThat(aggregateIdCaptor.getValue()).isEqualTo(materialId.toString());
+        assertThat(eventTypeCaptor.getValue()).isEqualTo(MATERIAL_DELETED);
+        assertThat(payloadCaptor.getValue().getMaterialId()).isEqualTo(materialId);
+        assertThat(payloadCaptor.getValue().getRootNodeId()).isEqualTo(rootNodeId);
+        assertThat(payloadCaptor.getValue().getDeletedAt()).isNotNull();
     }
 
     @Test
@@ -374,7 +392,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     }
 
     @Test
-    void updateSpeakingSection_titlesChanged_publishesSingleCompactTitlesEvent() {
+    void updateSpeakingSection_titlesChanged_appendsSingleCompactTitlesEventToOutbox() {
         Long materialId = 901L;
         Long rootNodeId = 910L;
         Long part1NodeId = 911L;
@@ -407,8 +425,22 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         service.updateSpeakingSection(command);
 
+        var eventIdCaptor = forClass(java.util.UUID.class);
+        var aggregateTypeCaptor = forClass(String.class);
+        var aggregateIdCaptor = forClass(String.class);
+        var eventTypeCaptor = forClass(String.class);
         var eventCaptor = forClass(MaterialDetailsUpsertedEvent.class);
-        verify(detailsUpsertedEventPublisher, times(1)).publishMaterialDetailsUpserted(eventCaptor.capture(), org.mockito.ArgumentMatchers.isNull());
+        verify(outboxPort, times(1)).append(
+                eventIdCaptor.capture(),
+                aggregateTypeCaptor.capture(),
+                aggregateIdCaptor.capture(),
+                eventTypeCaptor.capture(),
+                eventCaptor.capture());
+        assertThat(eventIdCaptor.getValue()).isNotNull();
+        assertThat(aggregateTypeCaptor.getValue()).isEqualTo("Material");
+        assertThat(aggregateIdCaptor.getValue()).isEqualTo(materialId.toString());
+        assertThat(eventTypeCaptor.getValue()).isEqualTo(MATERIAL_DETAILS_UPSERTED);
+
         MaterialDetailsUpsertedEvent event = eventCaptor.getValue();
         assertThat(event.getMaterialId()).isEqualTo(materialId);
         assertThat(event.getVersion()).isEqualTo(2L);
@@ -424,7 +456,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     }
 
     @Test
-    void updateSpeakingSection_partTitlesChanged_bumpsMaterialVersionAndPublishesVersionedTitlesEvent() {
+    void updateSpeakingSection_partTitlesChanged_bumpsMaterialVersionAndAppendsVersionedTitlesEventToOutbox() {
         Long materialId = 903L;
         Long rootNodeId = 930L;
         Long part1NodeId = 931L;
@@ -460,8 +492,22 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         verify(materialRepository, times(1)).save(materialCaptor.capture());
         assertThat(materialCaptor.getValue().getVersion()).isEqualTo(2L);
 
+        var eventIdCaptor = forClass(java.util.UUID.class);
+        var aggregateTypeCaptor = forClass(String.class);
+        var aggregateIdCaptor = forClass(String.class);
+        var eventTypeCaptor = forClass(String.class);
         var eventCaptor = forClass(MaterialDetailsUpsertedEvent.class);
-        verify(detailsUpsertedEventPublisher, times(1)).publishMaterialDetailsUpserted(eventCaptor.capture(), org.mockito.ArgumentMatchers.isNull());
+        verify(outboxPort, times(1)).append(
+                eventIdCaptor.capture(),
+                aggregateTypeCaptor.capture(),
+                aggregateIdCaptor.capture(),
+                eventTypeCaptor.capture(),
+                eventCaptor.capture());
+        assertThat(eventIdCaptor.getValue()).isNotNull();
+        assertThat(aggregateTypeCaptor.getValue()).isEqualTo("Material");
+        assertThat(aggregateIdCaptor.getValue()).isEqualTo(materialId.toString());
+        assertThat(eventTypeCaptor.getValue()).isEqualTo(MATERIAL_DETAILS_UPSERTED);
+
         MaterialDetailsUpsertedEvent event = eventCaptor.getValue();
         assertThat(event.getMaterialId()).isEqualTo(materialId);
         assertThat(event.getVersion()).isEqualTo(2L);
@@ -473,7 +519,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     }
 
     @Test
-    void updateSpeakingSection_onlyDescriptionChanged_doesNotPublishTitlesEvent() {
+    void updateSpeakingSection_onlyDescriptionChanged_doesNotAppendOutboxEvent() {
         Long materialId = 902L;
         Long rootNodeId = 920L;
         Long part1NodeId = 921L;
@@ -499,7 +545,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         service.updateSpeakingSection(command);
 
-        verify(detailsUpsertedEventPublisher, never()).publishMaterialDetailsUpserted(any(MaterialDetailsUpsertedEvent.class), any());
+        verify(outboxPort, never()).append(any(), any(), any(), any(), any());
     }
 
     @Test

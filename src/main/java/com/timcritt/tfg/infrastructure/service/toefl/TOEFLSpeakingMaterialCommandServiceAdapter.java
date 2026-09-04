@@ -17,16 +17,12 @@ public class TOEFLSpeakingMaterialCommandServiceAdapter implements TOEFLSpeaking
             MaterialNodeRepositoryPort materialNodeRepository,
             MaterialAssetRepositoryPort materialAssetRepository,
             StorageRepositoryPort storageRepositoryPort,
-            MaterialDeletionEventPublisherPort deletionEventPublisher,
-            MaterialDetailsUpsertedEventPublisherPort detailsUpsertedEventPublisher,
             IntegrationEventOutboxPort outboxPort) {
         this.delegate = new TOEFLSpeakingMaterialCommandService(
                 materialRepository,
                 materialNodeRepository,
                 materialAssetRepository,
                 storageRepositoryPort,
-                deletionEventPublisher,
-                detailsUpsertedEventPublisher,
                 outboxPort
         );
     }

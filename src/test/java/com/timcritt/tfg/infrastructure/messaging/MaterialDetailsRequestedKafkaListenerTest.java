@@ -2,12 +2,12 @@ package com.timcritt.tfg.infrastructure.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.timcritt.tfg.application.dto.SpeakingSectionEditResult;
+import com.timcritt.tfg.application.integration.MaterialDetailsUpsertedOutboxMessage;
+import com.timcritt.tfg.application.port.outbound.IntegrationEventOutboxPort;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
-import com.timcritt.tfg.application.port.outbound.MaterialDetailsUpsertedEventPublisherPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
 import com.timcritt.tfg.application.service.materialdetails.MaterialDetailsRequestService;
 import com.timcritt.tfg.domain.event.MaterialDetailsRequestedPayload;
-import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialStatus;
 import org.junit.jupiter.api.Test;
@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -26,12 +27,13 @@ import static org.mockito.Mockito.when;
 class MaterialDetailsRequestedKafkaListenerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    private static final String REQUEST_ID = "6e358158-9f6c-44dc-a2e8-0bcd7646c302";
 
     @Test
     void validRequest_publishesExpectedUpsertEvents() throws Exception {
         MaterialRepositoryPort materialRepository = mock(MaterialRepositoryPort.class);
         TOEFLSpeakingNavigationUseCase navigationUseCase = mock(TOEFLSpeakingNavigationUseCase.class);
-        MaterialDetailsUpsertedEventPublisherPort eventPublisher = mock(MaterialDetailsUpsertedEventPublisherPort.class);
+        IntegrationEventOutboxPort outboxPort = mock(IntegrationEventOutboxPort.class);
 
         Material material1 = material(101L, 5L, "TOEFL Speaking 101", "Desc 101", Instant.parse("2026-09-01T10:00:00Z"));
         Material material2 = material(202L, 9L, "TOEFL Speaking 202", "Desc 202", Instant.parse("2026-09-01T11:00:00Z"));
@@ -41,39 +43,53 @@ class MaterialDetailsRequestedKafkaListenerTest {
         when(navigationUseCase.getSpeakingSectionForEdit(101L)).thenReturn(Optional.of(details("TOEFL Speaking 101", "Part 1 A", "Part 2 A", "Desc 101")));
         when(navigationUseCase.getSpeakingSectionForEdit(202L)).thenReturn(Optional.of(details("TOEFL Speaking 202", "Part 1 B", "Part 2 B", "Desc 202")));
 
-        MaterialDetailsRequestService service = new MaterialDetailsRequestService(materialRepository, navigationUseCase, eventPublisher);
+        MaterialDetailsRequestService service = new MaterialDetailsRequestService(materialRepository, navigationUseCase, outboxPort);
         MaterialDetailsRequestedKafkaListener listener = new MaterialDetailsRequestedKafkaListener(objectMapper, service, enabledMessagingKafkaProperties());
 
         MaterialDetailsRequestedPayload payload = MaterialDetailsRequestedPayload.builder()
-                .requestId("request-123")
+                .requestId(REQUEST_ID)
                 .materialIds(List.of(101L, 202L))
                 .requestedAt(Instant.parse("2026-09-01T18:00:00Z"))
                 .build();
 
         listener.onMessage(objectMapper.writeValueAsString(payload));
 
-        org.mockito.ArgumentCaptor<MaterialDetailsUpsertedEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(MaterialDetailsUpsertedEvent.class);
-        org.mockito.ArgumentCaptor<String> requestIdCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(eventPublisher, times(2)).publishMaterialDetailsUpserted(eventCaptor.capture(), requestIdCaptor.capture());
+        org.mockito.ArgumentCaptor<UUID> eventIdCaptor = org.mockito.ArgumentCaptor.forClass(UUID.class);
+        org.mockito.ArgumentCaptor<String> aggregateTypeCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<String> aggregateIdCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<String> eventTypeCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<MaterialDetailsUpsertedOutboxMessage> payloadCaptor = org.mockito.ArgumentCaptor.forClass(MaterialDetailsUpsertedOutboxMessage.class);
+        verify(outboxPort, times(2)).append(
+                eventIdCaptor.capture(),
+                aggregateTypeCaptor.capture(),
+                aggregateIdCaptor.capture(),
+                eventTypeCaptor.capture(),
+                payloadCaptor.capture());
 
-        assertThat(requestIdCaptor.getAllValues()).containsExactly("request-123", "request-123");
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getMaterialId)
+        assertThat(eventIdCaptor.getAllValues()).allSatisfy(id -> assertThat(id).isNotNull());
+        assertThat(aggregateTypeCaptor.getAllValues()).containsExactly("Material", "Material");
+        assertThat(aggregateIdCaptor.getAllValues()).containsExactly("101", "202");
+        assertThat(eventTypeCaptor.getAllValues()).containsExactly("material.details.upserted.v1", "material.details.upserted.v1");
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(MaterialDetailsUpsertedOutboxMessage::getRequestId)
+                .containsExactly(REQUEST_ID, REQUEST_ID);
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(outboxMessage -> outboxMessage.getEvent().getMaterialId())
                 .containsExactly(101L, 202L);
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getVersion)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(outboxMessage -> outboxMessage.getEvent().getVersion())
                 .containsExactly(5L, 9L);
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getMaterialTitle)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(outboxMessage -> outboxMessage.getEvent().getMaterialTitle())
                 .containsExactly("TOEFL Speaking 101", "TOEFL Speaking 202");
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getPart1Title)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(outboxMessage -> outboxMessage.getEvent().getPart1Title())
                 .containsExactly("Part 1 A", "Part 1 B");
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getPart2Title)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(outboxMessage -> outboxMessage.getEvent().getPart2Title())
                 .containsExactly("Part 2 A", "Part 2 B");
-        assertThat(eventCaptor.getAllValues())
-                .extracting(MaterialDetailsUpsertedEvent::getDescription)
+        assertThat(payloadCaptor.getAllValues())
+                .extracting(outboxMessage -> outboxMessage.getEvent().getDescription())
                 .containsExactly("Desc 101", "Desc 202");
     }
 
@@ -139,7 +155,7 @@ class MaterialDetailsRequestedKafkaListenerTest {
         MaterialDetailsRequestedKafkaListener listener = new MaterialDetailsRequestedKafkaListener(objectMapper, service, enabledMessagingKafkaProperties());
 
         MaterialDetailsRequestedPayload payload = MaterialDetailsRequestedPayload.builder()
-                .requestId("request-123")
+                .requestId(REQUEST_ID)
                 .materialIds(List.of(1L, 1L, 2L))
                 .requestedAt(Instant.parse("2026-09-01T18:00:00Z"))
                 .build();
@@ -157,7 +173,7 @@ class MaterialDetailsRequestedKafkaListenerTest {
         MaterialDetailsRequestedKafkaListener listener = new MaterialDetailsRequestedKafkaListener(objectMapper, service, properties);
 
         MaterialDetailsRequestedPayload payload = MaterialDetailsRequestedPayload.builder()
-                .requestId("request-123")
+                .requestId(REQUEST_ID)
                 .materialIds(List.of(101L))
                 .requestedAt(Instant.parse("2026-09-01T18:00:00Z"))
                 .build();
