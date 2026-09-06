@@ -85,9 +85,15 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                                 "Material not found: " + materialId
                         )
                 );
+        if (!hasText(material.getTitle()) || "Untitled Draft".equals(material.getTitle())) {
+            throw new IllegalStateException("Cannot publish: material title is required");
+        }
+
+        if (material.getRoot() == null && material.getMaterialNodeId() != null) {
+            material.attachRoot(loadSpeakingSectionRoot(material.getId(), material.getMaterialNodeId()));
+        }
 
         material.publish(new ToeflSpeaking2026MaterialPolicy());
-
         materialRepository.save(material);
     }
 
@@ -342,7 +348,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         Set<String> storageKeysAfterUpdate;
         Material material;
         MaterialNode rootNode;
-        boolean materialDirty = false;
+        boolean materialDetailsChanged = false;
         boolean titlesChanged = false;
 
         try {
@@ -355,21 +361,18 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
             // ── Update material text fields ──────────────────────────────────────
             if (hasText(command.getMaterialTitle()) && !Objects.equals(material.getTitle(), command.getMaterialTitle())) {
-                material.setTitle(command.getMaterialTitle());
+                material.updateDetails(command.getMaterialTitle(), command.getMaterialDescription());
                 rootNode.setTitle(command.getMaterialTitle());
                 titlesChanged = true;
-                materialDirty = true;
+                materialDetailsChanged = true;
+            } else if (command.getMaterialDescription() != null) {
+                material.updateDetails(null, command.getMaterialDescription());
+                materialDetailsChanged = true;
             }
-            if (command.getMaterialDescription() != null) {
-                material.setDescription(command.getMaterialDescription());
-                materialDirty = true;
-            }
-            if (materialDirty) {
-                Instant now = Instant.now();
-                material.setUpdatedAt(now);
-                material.setVersion(material.getVersion() + 1);
+            if (materialDetailsChanged) {
                 materialRepository.save(material);
-                rootNode.setUpdatedAt(now);
+                Instant updatedAt = material.getUpdatedAt();
+                rootNode.setUpdatedAt(updatedAt);
                 rootNode.setVersion(rootNode.getVersion() + 1);
                 materialNodeRepository.save(rootNode);
             }
@@ -457,10 +460,8 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             }
         }
 
-        if (titlesChanged && !materialDirty) {
-            Instant now = Instant.now();
-            material.setUpdatedAt(now);
-            material.setVersion(material.getVersion() + 1);
+        if (titlesChanged && !materialDetailsChanged) {
+            material.updateDetails(material.getTitle(), material.getDescription());
             materialRepository.save(material);
         }
 
@@ -490,6 +491,56 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         return materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, displayOrder)
                 .map(MaterialNode::getTitle)
                 .orElse(null);
+    }
+
+    private MaterialNode loadSpeakingSectionRoot(Long materialId, Long rootNodeId) {
+        MaterialNode root = materialNodeRepository.findById(rootNodeId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Root section node not found for material: " + materialId
+                ));
+
+        if (root.getMaterialId() == null) {
+            root.setMaterialId(materialId);
+        }
+
+        Map<Long, MaterialNode> nodesById = new HashMap<>();
+        ArrayDeque<Long> toVisit = new ArrayDeque<>();
+        nodesById.put(root.getId(), root);
+        toVisit.add(root.getId());
+
+        while (!toVisit.isEmpty()) {
+            Long currentId = toVisit.removeFirst();
+            for (MaterialNode child : materialNodeRepository.findByParentNodeId(currentId)) {
+                if (child.getId() == null) {
+                    continue;
+                }
+                if (child.getMaterialId() == null) {
+                    child.setMaterialId(materialId);
+                }
+                nodesById.putIfAbsent(child.getId(), child);
+                toVisit.addLast(child.getId());
+            }
+        }
+
+        for (MaterialNode node : nodesById.values()) {
+            if (node.getParentNodeId() != null) {
+                MaterialNode parent = nodesById.get(node.getParentNodeId());
+                if (parent == null) {
+                    throw new IllegalStateException(
+                            "Parent node " + node.getParentNodeId() + " not found while loading speaking material"
+                    );
+                }
+                parent.addChild(node);
+            }
+        }
+
+        for (MaterialNode node : nodesById.values()) {
+            for (MaterialAsset asset : materialAssetRepository.findByMaterialNodeId(node.getId())) {
+                node.addAsset(asset);
+            }
+        }
+
+        return root;
     }
 
     /**

@@ -60,16 +60,9 @@ public class Material {
         return title;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
-    }
 
     public String getDescription() {
         return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
     }
 
     public Long getAuthorId() {
@@ -100,9 +93,6 @@ public class Material {
         return version;
     }
 
-    public void setVersion(Long version) {
-        this.version = version;
-    }
 
     public Instant getCreatedAt() {
         return createdAt;
@@ -114,10 +104,6 @@ public class Material {
 
     public Instant getUpdatedAt() {
         return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public void attachRoot(MaterialNode root) {
@@ -161,6 +147,26 @@ public class Material {
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    public void updateDetails(
+            String title,
+            String description
+    ) {
+        if (title != null) {
+            if (title.isBlank()) {
+                throw new IllegalArgumentException("title cannot be blank");
+            }
+
+            this.title = title.trim();
+        }
+
+        if (description != null) {
+            this.description = description.trim();
+        }
+
+        this.version = version == null ? 1L : version + 1;
+        this.updatedAt = Instant.now();
     }
 
     public static final class Builder {
