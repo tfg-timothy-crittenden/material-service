@@ -10,8 +10,6 @@ public class Material {
     private Long id;
     private Long examFamilyId;
 
-    private Long materialNodeId;
-
     private MaterialNode root;
 
     private String title;
@@ -28,38 +26,31 @@ public class Material {
     private Material() {
     }
 
+    // ***************************** GETTERS *****************************
+
     public Long getId() {
         return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public Long getExamFamilyId() {
         return examFamilyId;
     }
 
-    public void setExamFamilyId(Long examFamilyId) {
-        this.examFamilyId = examFamilyId;
-    }
-
-    public Long getMaterialNodeId() {
-        return materialNodeId;
-    }
-
-    public void setMaterialNodeId(Long materialNodeId) {
-        this.materialNodeId = materialNodeId;
-    }
-
     public MaterialNode getRoot() {
         return root;
+    }
+
+    public boolean hasRoot() {
+        return root != null;
+    }
+
+    public Long getRootId() {
+        return root != null ? root.getId() : null;
     }
 
     public String getTitle() {
         return title;
     }
-
 
     public String getDescription() {
         return description;
@@ -69,42 +60,27 @@ public class Material {
         return authorId;
     }
 
-    public void setAuthorId(Long authorId) {
-        this.authorId = authorId;
-    }
-
     public Long getOwnerOrgId() {
         return ownerOrgId;
-    }
-
-    public void setOwnerOrgId(Long ownerOrgId) {
-        this.ownerOrgId = ownerOrgId;
     }
 
     public MaterialStatus getStatus() {
         return status;
     }
 
-    public void setStatus(MaterialStatus status) {
-        this.status = status;
-    }
-
     public Long getVersion() {
         return version;
     }
-
 
     public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public Instant getUpdatedAt() {
         return updatedAt;
     }
+
+    // ***************************** DOMAIN BEHAVIOUR *****************************
 
     public void attachRoot(MaterialNode root) {
         Objects.requireNonNull(root, "root cannot be null");
@@ -122,7 +98,6 @@ public class Material {
         }
 
         this.root = root;
-        this.materialNodeId = root.getId();
     }
 
     public void publish(MaterialPolicy policy) {
@@ -141,12 +116,8 @@ public class Material {
         policy.validateForPublication(this);
 
         this.status = MaterialStatus.PUBLISHED;
-        this.version = version == null ? 1L : version + 1;
-        this.updatedAt = Instant.now();
-    }
-
-    public static Builder builder() {
-        return new Builder();
+        incrementVersion();
+        touch();
     }
 
     public void updateDetails(
@@ -155,7 +126,9 @@ public class Material {
     ) {
         if (title != null) {
             if (title.isBlank()) {
-                throw new IllegalArgumentException("title cannot be blank");
+                throw new IllegalArgumentException(
+                        "title cannot be blank"
+                );
             }
 
             this.title = title.trim();
@@ -165,8 +138,24 @@ public class Material {
             this.description = description.trim();
         }
 
+        incrementVersion();
+        touch();
+    }
+
+    // ***************************** INTERNAL DOMAIN HELPERS *****************************
+
+    private void incrementVersion() {
         this.version = version == null ? 1L : version + 1;
+    }
+
+    private void touch() {
         this.updatedAt = Instant.now();
+    }
+
+    // ***************************** REHYDRATION BUILDER *****************************
+
+    public static Builder builder() {
+        return new Builder();
     }
 
     public static final class Builder {
@@ -180,16 +169,6 @@ public class Material {
 
         public Builder examFamilyId(Long examFamilyId) {
             material.examFamilyId = examFamilyId;
-            return this;
-        }
-
-        public Builder materialNodeId(Long materialNodeId) {
-            material.materialNodeId = materialNodeId;
-            return this;
-        }
-
-        public Builder root(MaterialNode root) {
-            material.root = root;
             return this;
         }
 

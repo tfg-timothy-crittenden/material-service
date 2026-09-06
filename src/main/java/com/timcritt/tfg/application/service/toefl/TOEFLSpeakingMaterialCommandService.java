@@ -61,7 +61,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
         Material savedMaterial = createMaterial(effectiveTitle, command.getMaterialDescription());
         MaterialNode savedRootNode = createSectionRoot(savedMaterial.getId(), effectiveTitle);
-        savedMaterial.setMaterialNodeId(savedRootNode.getId());
+        savedMaterial.attachRoot(savedRootNode);
         materialRepository.save(savedMaterial);
 
         // Always create Part 1 and Part 2 to scaffold the full tree structure.
@@ -85,15 +85,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                                 "Material not found: " + materialId
                         )
                 );
-        if (!hasText(material.getTitle()) || "Untitled Draft".equals(material.getTitle())) {
-            throw new IllegalStateException("Cannot publish: material title is required");
-        }
-
-        if (material.getRoot() == null && material.getMaterialNodeId() != null) {
-            material.attachRoot(loadSpeakingSectionRoot(material.getId(), material.getMaterialNodeId()));
-        }
 
         material.publish(new ToeflSpeaking2026MaterialPolicy());
+
         materialRepository.save(material);
     }
 
@@ -106,7 +100,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         Material material = materialRepository.findById(materialId)
                 .orElseThrow(() -> new IllegalArgumentException("Material not found: " + materialId));
 
-        Long rootNodeId = material.getMaterialNodeId();
+        Long rootNodeId = material.getRootId();
         if (rootNodeId != null) {
             List<Long> nodeIds = collectSubtreeNodeIds(rootNodeId);
             List<String> storageKeys = new ArrayList<>();
@@ -175,7 +169,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         Material material = Material.builder()
                 .id(null)
                 .examFamilyId(TOEFL_EXAM_FAMILY_ID)
-                .materialNodeId(null)
                 .title(materialTitle)
                 .description(materialDescription)
                 .authorId(null)
@@ -355,7 +348,10 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             // ── Load material and root section node ──────────────────────────────
             material = materialRepository.findById(command.getMaterialId())
                     .orElseThrow(() -> new IllegalArgumentException("Material not found: " + command.getMaterialId()));
-            rootNode = materialNodeRepository.findById(material.getMaterialNodeId())
+            if (!material.hasRoot()) {
+                throw new IllegalArgumentException("Root section node not found for material: " + command.getMaterialId());
+            }
+            rootNode = materialNodeRepository.findById(material.getRootId())
                     .orElseThrow(() -> new IllegalArgumentException("Root section node not found for material: " + command.getMaterialId()));
             storageKeysBeforeUpdate = collectStorageKeysForSubtree(rootNode.getId());
 
@@ -461,7 +457,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         }
 
         if (titlesChanged && !materialDetailsChanged) {
-            material.updateDetails(material.getTitle(), material.getDescription());
+            material.updateDetails(null, null);
             materialRepository.save(material);
         }
 
@@ -493,55 +489,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 .orElse(null);
     }
 
-    private MaterialNode loadSpeakingSectionRoot(Long materialId, Long rootNodeId) {
-        MaterialNode root = materialNodeRepository.findById(rootNodeId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Root section node not found for material: " + materialId
-                ));
-
-        if (root.getMaterialId() == null) {
-            root.setMaterialId(materialId);
-        }
-
-        Map<Long, MaterialNode> nodesById = new HashMap<>();
-        ArrayDeque<Long> toVisit = new ArrayDeque<>();
-        nodesById.put(root.getId(), root);
-        toVisit.add(root.getId());
-
-        while (!toVisit.isEmpty()) {
-            Long currentId = toVisit.removeFirst();
-            for (MaterialNode child : materialNodeRepository.findByParentNodeId(currentId)) {
-                if (child.getId() == null) {
-                    continue;
-                }
-                if (child.getMaterialId() == null) {
-                    child.setMaterialId(materialId);
-                }
-                nodesById.putIfAbsent(child.getId(), child);
-                toVisit.addLast(child.getId());
-            }
-        }
-
-        for (MaterialNode node : nodesById.values()) {
-            if (node.getParentNodeId() != null) {
-                MaterialNode parent = nodesById.get(node.getParentNodeId());
-                if (parent == null) {
-                    throw new IllegalStateException(
-                            "Parent node " + node.getParentNodeId() + " not found while loading speaking material"
-                    );
-                }
-                parent.addChild(node);
-            }
-        }
-
-        for (MaterialNode node : nodesById.values()) {
-            for (MaterialAsset asset : materialAssetRepository.findByMaterialNodeId(node.getId())) {
-                node.addAsset(asset);
-            }
-        }
-
-        return root;
-    }
 
     /**
      * Applies a partial update command to a single question (ITEM) node.

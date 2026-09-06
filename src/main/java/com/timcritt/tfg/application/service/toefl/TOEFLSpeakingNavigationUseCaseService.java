@@ -38,8 +38,8 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
         int zeroBasedPartOrder = partOrder - 1;
         int zeroBasedQuestionOrder = questionOrder - 1;
         Optional<Material> materialOpt = materialRepository.findById(materialId);
-        if (materialOpt.isEmpty() || materialOpt.get().getMaterialNodeId() == null) return Optional.empty();
-        Long rootNodeId = materialOpt.get().getMaterialNodeId();
+        if (materialOpt.isEmpty() || !materialOpt.get().hasRoot()) return Optional.empty();
+        Long rootNodeId = materialOpt.get().getRootId();
         Optional<MaterialNode> partNodeOpt = materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, zeroBasedPartOrder);
         if (partNodeOpt.isEmpty()) return Optional.empty();
         Long partNodeId = partNodeOpt.get().getId();
@@ -53,12 +53,12 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
     @Override
     public Optional<SpeakingSectionEditResult> getSpeakingSectionForEdit(Long materialId) {
         Optional<Material> materialOpt = materialRepository.findById(materialId);
-        if (materialOpt.isEmpty() || materialOpt.get().getMaterialNodeId() == null) {
+        if (materialOpt.isEmpty() || !materialOpt.get().hasRoot()) {
             return Optional.empty();
         }
 
         Material material = materialOpt.get();
-        Optional<MaterialNode> rootOpt = materialNodeRepository.findById(material.getMaterialNodeId());
+        Optional<MaterialNode> rootOpt = materialNodeRepository.findById(material.getRootId());
         if (rootOpt.isEmpty()) {
             return Optional.empty();
         }

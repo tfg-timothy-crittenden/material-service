@@ -42,21 +42,9 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
         Instant createdAt = Instant.parse("2026-05-01T10:15:30Z");
         Instant updatedAt = Instant.parse("2026-05-01T11:15:30Z");
 
-        Material publishedMaterial = Material.builder()
-                .id(100L)
-                .materialNodeId(10L)
-                .title("Published Material")
-                .status(MaterialStatus.PUBLISHED)
-                .createdAt(createdAt)
-                .updatedAt(updatedAt)
-                .build();
+        Material publishedMaterial = materialWithRoot(100L, 10L, "Published Material", null, MaterialStatus.PUBLISHED, createdAt, updatedAt);
 
-        Material draftMaterial = Material.builder()
-                .id(200L)
-                .materialNodeId(20L)
-                .title("Draft Material")
-                .status(MaterialStatus.DRAFT)
-                .build();
+        Material draftMaterial = materialWithRoot(200L, 20L, "Draft Material", null, MaterialStatus.DRAFT, null, null);
 
         when(materialNodeRepository.findByKind("SECTION")).thenReturn(List.of(publishedSection, draftSection, orphanSection));
         when(materialNodeRepository.findByParentNodeId(10L)).thenReturn(List.of(publishedPart1, publishedPart2));
@@ -108,21 +96,9 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
         Instant createdAt = Instant.parse("2026-05-01T12:15:30Z");
         Instant updatedAt = Instant.parse("2026-05-01T13:15:30Z");
 
-        Material publishedMaterial = Material.builder()
-                .id(100L)
-                .materialNodeId(10L)
-                .title("Published Material")
-                .status(MaterialStatus.PUBLISHED)
-                .build();
+        Material publishedMaterial = materialWithRoot(100L, 10L, "Published Material", null, MaterialStatus.PUBLISHED, null, null);
 
-        Material draftMaterial = Material.builder()
-                .id(200L)
-                .materialNodeId(20L)
-                .title("Draft Material")
-                .status(MaterialStatus.DRAFT)
-                .createdAt(createdAt)
-                .updatedAt(updatedAt)
-                .build();
+        Material draftMaterial = materialWithRoot(200L, 20L, "Draft Material", null, MaterialStatus.DRAFT, createdAt, updatedAt);
 
         when(materialNodeRepository.findByKind("SECTION")).thenReturn(List.of(publishedSection, draftSection, orphanSection));
         when(materialNodeRepository.findByParentNodeId(10L)).thenReturn(List.of());
@@ -168,13 +144,7 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
         Long sectionId = 500L;
         Long part1Id = 501L;
 
-        Material material = Material.builder()
-                .id(materialId)
-                .materialNodeId(sectionId)
-                .title("Draft Material")
-                .description("desc")
-                .status(MaterialStatus.DRAFT)
-                .build();
+        Material material = materialWithRoot(materialId, sectionId, "Draft Material", "desc", MaterialStatus.DRAFT, null, null);
         MaterialNode section = MaterialNode.builder().id(sectionId).kind("SECTION").title("Draft Material").build();
         MaterialNode part1 = MaterialNode.builder().id(part1Id).parentNodeId(sectionId).displayOrder(0).title("Part 1").build();
 
@@ -190,5 +160,28 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
         assertThat(result).isPresent();
         assertThat(result.get().getStatus()).isEqualTo(MaterialStatus.DRAFT);
     }
+
+    private static Material materialWithRoot(Long materialId, Long rootNodeId, String title, String description, MaterialStatus status, Instant createdAt, Instant updatedAt) {
+        Material.Builder builder = Material.builder().id(materialId);
+        if (title != null) {
+            builder.title(title);
+        }
+        if (description != null) {
+            builder.description(description);
+        }
+        if (status != null) {
+            builder.status(status);
+        }
+        if (createdAt != null) {
+            builder.createdAt(createdAt);
+        }
+        if (updatedAt != null) {
+            builder.updatedAt(updatedAt);
+        }
+        Material material = builder.build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
+        return material;
+    }
+
 }
 

@@ -86,11 +86,25 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> {
             Material material = invocation.getArgument(0);
             if (material.getId() == null) {
-                material.setId(materialIds.getAndIncrement());
+                Material created = Material.builder()
+                        .id(materialIds.getAndIncrement())
+                        .examFamilyId(material.getExamFamilyId())
+                        .title(material.getTitle())
+                        .description(material.getDescription())
+                        .authorId(material.getAuthorId())
+                        .ownerOrgId(material.getOwnerOrgId())
+                        .status(material.getStatus())
+                        .version(material.getVersion())
+                        .createdAt(material.getCreatedAt())
+                        .updatedAt(material.getUpdatedAt())
+                        .build();
+                if (material.getRoot() != null) {
+                    created.attachRoot(material.getRoot());
+                }
+                material = created;
             }
-            savedMaterials.add(Material.builder()
+            Material savedMaterial = Material.builder()
                     .id(material.getId())
-                    .materialNodeId(material.getMaterialNodeId())
                     .examFamilyId(material.getExamFamilyId())
                     .title(material.getTitle())
                     .description(material.getDescription())
@@ -98,7 +112,11 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     .version(material.getVersion())
                     .createdAt(material.getCreatedAt())
                     .updatedAt(material.getUpdatedAt())
-                    .build());
+                    .build();
+            if (material.getRoot() != null) {
+                savedMaterial.attachRoot(material.getRoot());
+            }
+            savedMaterials.add(savedMaterial);
             return material;
         });
 
@@ -121,7 +139,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         assertThat(materialId).isEqualTo(1000L);
         assertThat(savedMaterials).hasSize(2);
-        assertThat(savedMaterials.getFirst().getMaterialNodeId()).isNull();
+        assertThat(savedMaterials.getFirst().getRoot()).isNull();
 
         var storageKeyCaptor = forClass(String.class);
         verify(storageRepositoryPort, times(4)).uploadObject(eq("toefl"), storageKeyCaptor.capture(), any());
@@ -138,7 +156,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .orElseThrow();
 
         assertThat(root.getMaterialId()).isEqualTo(materialId);
-        assertThat(savedMaterials.get(1).getMaterialNodeId()).isEqualTo(root.getId());
+        assertThat(savedMaterials.get(1).getRoot().getId()).isEqualTo(root.getId());
 
         MaterialNode part1 = savedNodes.stream()
                 .filter(node -> root.getId().equals(node.getParentNodeId()) && node.getDisplayOrder() == 0)
@@ -208,9 +226,9 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Long rootNodeId = 100L;
         Long childNodeId = 101L;
 
-        when(materialRepository.findById(materialId)).thenReturn(Optional.of(
-                Material.builder().id(materialId).materialNodeId(rootNodeId).build()
-        ));
+        Material material = Material.builder().id(materialId).build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
         when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(
                 MaterialNode.builder().id(childNodeId).parentNodeId(rootNodeId).build()
         ));
@@ -259,7 +277,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Long rootNodeId = 200L;
         Long part1NodeId = 201L;
 
-        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).version(1L).build();
+        Material material = Material.builder().id(materialId).version(1L).build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
         MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Section").version(1L).build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).version(1L).build();
 
@@ -305,7 +324,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Long rootNodeId = 300L;
         Long part1NodeId = 301L;
 
-        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).version(1L).build();
+        Material material = Material.builder().id(materialId).version(1L).build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
         MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Section").version(1L).build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).version(1L).build();
 
@@ -373,7 +393,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Long part1NodeId = 401L;
         Long questionNodeId = 402L;
 
-        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).version(1L).build();
+        Material material = Material.builder().id(materialId).version(1L).build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
         MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Section").version(1L).build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).version(1L).build();
         MaterialNode q0 = MaterialNode.builder().id(questionNodeId).parentNodeId(part1NodeId).displayOrder(0).version(1L).build();
@@ -422,7 +443,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Long part1NodeId = 911L;
         Long part2NodeId = 912L;
 
-        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).title("Old Material").version(1L).build();
+        Material material = Material.builder().id(materialId).title("Old Material").version(1L).build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
         MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Old Material").version(1L).build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Old Part 1").version(1L).build();
         MaterialNode part2 = MaterialNode.builder().id(part2NodeId).parentNodeId(rootNodeId).displayOrder(1).title("Old Part 2").version(1L).build();
@@ -486,7 +508,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Long part1NodeId = 931L;
         Long part2NodeId = 932L;
 
-        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).title("Old Material").version(1L).build();
+        Material material = Material.builder().id(materialId).title("Old Material").version(1L).build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
         MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Old Material").version(1L).build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Old Part 1").version(1L).build();
         MaterialNode part2 = MaterialNode.builder().id(part2NodeId).parentNodeId(rootNodeId).displayOrder(1).title("Old Part 2").version(1L).build();
@@ -548,7 +571,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Long rootNodeId = 920L;
         Long part1NodeId = 921L;
 
-        Material material = Material.builder().id(materialId).materialNodeId(rootNodeId).title("Material").version(1L).build();
+        Material material = Material.builder().id(materialId).title("Material").version(1L).build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
         MaterialNode root = MaterialNode.builder().id(rootNodeId).title("Material").version(1L).build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).parentNodeId(rootNodeId).displayOrder(0).title("Part 1").version(1L).build();
 
@@ -592,11 +616,11 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         Material material = Material.builder()
                 .id(materialId)
-                .materialNodeId(rootNodeId)
                 .title("Complete speaking section")
                 .status(MaterialStatus.DRAFT)
                 .version(2L)
                 .build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
 
         MaterialNode root = MaterialNode.builder()
                 .id(rootNodeId)
@@ -689,11 +713,11 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         Material material = Material.builder()
                 .id(materialId)
-                .materialNodeId(rootNodeId)
                 .title(" ")
                 .status(MaterialStatus.DRAFT)
                 .version(1L)
                 .build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
 
@@ -714,11 +738,11 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         Material material = Material.builder()
                 .id(materialId)
-                .materialNodeId(rootNodeId)
                 .title("Complete speaking section")
                 .status(MaterialStatus.DRAFT)
                 .version(1L)
                 .build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
 
         MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind("SECTION").title("Complete speaking section").build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind("PART").title("Part 1").build();
@@ -779,11 +803,11 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         Material material = Material.builder()
                 .id(materialId)
-                .materialNodeId(rootNodeId)
                 .title("Complete speaking section")
                 .status(MaterialStatus.DRAFT)
                 .version(1L)
                 .build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
 
         MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind("SECTION").title("Complete speaking section").build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind("PART").title("Part 1").build();
@@ -857,11 +881,11 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         Material material = Material.builder()
                 .id(materialId)
-                .materialNodeId(rootNodeId)
                 .title("Complete speaking section")
                 .status(MaterialStatus.DRAFT)
                 .version(1L)
                 .build();
+        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
 
         MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind("SECTION").title("Complete speaking section").build();
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind("PART").title("Part 1").build();
