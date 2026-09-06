@@ -13,6 +13,7 @@ import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.MaterialNode;
 import com.timcritt.tfg.domain.model.MaterialStatus;
+import com.timcritt.tfg.domain.policy.toefl.ToeflSpeaking2026MaterialPolicy;
 
 import java.io.ByteArrayInputStream;
 import java.util.*;
@@ -79,74 +80,14 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
     @Override
     public void publishSpeakingSection(Long materialId) {
         Material material = materialRepository.findById(materialId)
-                .orElseThrow(() -> new IllegalArgumentException("Material not found: " + materialId));
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Material not found: " + materialId
+                        )
+                );
 
-        if (material.getStatus() == MaterialStatus.PUBLISHED) {
-            return; // idempotent – already published
-        }
+        material.publish(new ToeflSpeaking2026MaterialPolicy());
 
-        // ── Completeness validation ───────────────────────────────────────────
-        if (!hasText(material.getTitle()) || "Untitled Draft".equals(material.getTitle())) {
-            throw new IllegalStateException("Cannot publish: material title is required");
-        }
-
-        MaterialNode rootNode = materialNodeRepository.findById(material.getMaterialNodeId())
-                .orElseThrow(() -> new IllegalStateException("Cannot publish: section node not found"));
-
-        MaterialNode part1 = materialNodeRepository.findByParentIdAndDisplayOrder(rootNode.getId(), 0)
-                .orElseThrow(() -> new IllegalStateException("Cannot publish: Part 1 is missing"));
-
-        if (!hasText(part1.getTitle())) {
-            throw new IllegalStateException("Cannot publish: Part 1 title is required");
-        }
-
-        boolean part1HasImage = materialAssetRepository.findByMaterialNodeId(part1.getId()).stream()
-                .anyMatch(a -> a.getKind() == MaterialAsset.Kind.IMAGE);
-        if (!part1HasImage) {
-            throw new IllegalStateException("Cannot publish: Part 1 image is required");
-        }
-
-        List<MaterialNode> part1Questions = materialNodeRepository.findByParentNodeId(part1.getId());
-        if (part1Questions.isEmpty()) {
-            throw new IllegalStateException("Cannot publish: Part 1 must have at least one question");
-        }
-        for (MaterialNode q : part1Questions) {
-            if (!hasText(q.getTranscriptText())) {
-                throw new IllegalStateException("Cannot publish: all Part 1 questions must have transcript text");
-            }
-            boolean hasAudio = materialAssetRepository.findByMaterialNodeId(q.getId()).stream()
-                    .anyMatch(a -> a.getKind() == MaterialAsset.Kind.AUDIO);
-            if (!hasAudio) {
-                throw new IllegalStateException("Cannot publish: Part 1 question " + q.getDisplayOrder() + " is missing audio");
-            }
-        }
-
-        MaterialNode part2 = materialNodeRepository.findByParentIdAndDisplayOrder(rootNode.getId(), 1)
-                .orElseThrow(() -> new IllegalStateException("Cannot publish: Part 2 is missing"));
-
-        if (!hasText(part2.getTitle())) {
-            throw new IllegalStateException("Cannot publish: Part 2 title is required");
-        }
-
-        List<MaterialNode> part2Questions = materialNodeRepository.findByParentNodeId(part2.getId());
-        if (part2Questions.size() != 4) {
-            throw new IllegalStateException("Cannot publish: Part 2 must have exactly 4 questions (found " + part2Questions.size() + ")");
-        }
-        for (MaterialNode q : part2Questions) {
-            if (!hasText(q.getTranscriptText())) {
-                throw new IllegalStateException("Cannot publish: all Part 2 questions must have transcript text");
-            }
-            boolean hasAudio = materialAssetRepository.findByMaterialNodeId(q.getId()).stream()
-                    .anyMatch(a -> a.getKind() == MaterialAsset.Kind.AUDIO);
-            if (!hasAudio) {
-                throw new IllegalStateException("Cannot publish: Part 2 question " + q.getDisplayOrder() + " is missing audio");
-            }
-        }
-
-        // ── Flip status ───────────────────────────────────────────────────────
-        material.setStatus(MaterialStatus.PUBLISHED);
-        material.setUpdatedAt(Instant.now());
-        material.setVersion(material.getVersion() + 1);
         materialRepository.save(material);
     }
 

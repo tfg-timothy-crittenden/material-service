@@ -9,5 +9,8 @@ public interface MaterialAssetRepositoryPort {
     List<MaterialAsset> findByMaterialNodeId(Long materialNodeId);
     MaterialAsset save(MaterialAsset asset);
     void deleteById(Long id);
+
+    
+
 }
 

@@ -25,7 +25,7 @@ class ArchitectureTest {
 
         ArchRule domainMustBeIndependent = ArchRuleDefinition.noClasses()
                 .that().resideInAPackage(DOMAIN)
-                .should().dependOnClassesThat().resideInAnyPackage(APPLICATION, INFRASTRUCTURE)
+                .should().dependOnClassesThat().resideInAnyPackage(APPLICATION, INFRASTRUCTURE, "lombok..")
                 .allowEmptyShould(true);
 
         ArchRule applicationMustNotDependOnInfrastructure = ArchRuleDefinition.noClasses()

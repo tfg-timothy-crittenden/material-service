@@ -1,6 +1,5 @@
 package com.timcritt.tfg.infrastructure.persistence.mapper;
 import com.timcritt.tfg.domain.model.Material;
-import com.timcritt.tfg.domain.model.MaterialStatus;
 import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialJpaEntity;
 
 public class MaterialEntityMapper {
@@ -21,21 +20,26 @@ public class MaterialEntityMapper {
                 .build();
     }
 
-    public static MaterialJpaEntity toEntity(Material domain) {
-        if (domain == null) return null;
+    public static MaterialJpaEntity toEntity(Material material) {
+        if (material == null) {
+            return null;
+        }
         return MaterialJpaEntity.builder()
-                .id(domain.getId())
-                .examFamilyId(domain.getExamFamilyId())
-                .materialNodeId(domain.getMaterialNodeId())
-                .title(domain.getTitle())
-                .description(domain.getDescription())
-                .authorId(domain.getAuthorId())
-                .ownerOrgId(domain.getOwnerOrgId())
-                // Default to DRAFT if not explicitly set – prevents accidental null.
-                .status(domain.getStatus() != null ? domain.getStatus() : MaterialStatus.DRAFT)
-                .version(domain.getVersion())
-                .createdAt(domain.getCreatedAt())
-                .updatedAt(domain.getUpdatedAt())
+                .id(material.getId())
+                .examFamilyId(material.getExamFamilyId())
+                .materialNodeId(
+                        material.getRoot() != null
+                                ? material.getRoot().getId()
+                                : material.getMaterialNodeId()
+                )
+                .title(material.getTitle())
+                .description(material.getDescription())
+                .authorId(material.getAuthorId())
+                .ownerOrgId(material.getOwnerOrgId())
+                .status(material.getStatus())
+                .version(material.getVersion())
+                .createdAt(material.getCreatedAt())
+                .updatedAt(material.getUpdatedAt())
                 .build();
     }
 }
