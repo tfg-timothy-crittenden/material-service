@@ -196,54 +196,30 @@ public class MaterialNode {
     }
 
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
     public Long getMaterialId() { return materialId; }
-    public void setMaterialId(Long materialId) { this.materialId = materialId; }
     public Long getParentNodeId() { return parentNodeId; }
-    public void setParentNodeId(Long parentNodeId) { this.parentNodeId = parentNodeId; }
     public MaterialNodeKind getKind() { return kind; }
-    public void setKind(MaterialNodeKind kind) { this.kind = kind; }
     public String getTitle() { return title; }
     public Integer getDisplayOrder() { return displayOrder; }
-    public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
     public Long getSkillId() { return skillId; }
-
     public Long getTaskTypeId() { return taskTypeId; }
-
     public String getInstructions() { return instructions; }
-
     public String getStimulusText() { return stimulusText; }
-
     public String getTranscriptText() { return transcriptText; }
-
     public String getExplanationText() { return explanationText; }
-
     public Integer getTimeLimitSeconds() { return timeLimitSeconds; }
-
     public Integer getPrepTimeSeconds() { return prepTimeSeconds; }
-
     public String getResponseMode() { return responseMode; }
-
     public Boolean getResponseRequired() { return responseRequired; }
-
     public Integer getMinDurationSeconds() { return minDurationSeconds; }
-
     public Integer getMaxDurationSeconds() { return maxDurationSeconds; }
-
     public Integer getMinWordCount() { return minWordCount; }
-
     public Integer getMaxWordCount() { return maxWordCount; }
-
     public String getScoringMode() { return scoringMode; }
-
     public Double getMaxScore() { return maxScore; }
-
     public Double getPassingScore() { return passingScore; }
-
     public Long getVersion() { return version; }
-
     public Instant getCreatedAt() { return createdAt; }
-
     public Instant getUpdatedAt() { return updatedAt; }
 
 
