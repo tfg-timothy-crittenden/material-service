@@ -47,7 +47,7 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
 
         Material draftMaterial = materialWithRoot(200L, 20L, "Draft Material", null, MaterialStatus.DRAFT, null, null);
 
-        when(materialNodeRepository.findByKind("SECTION")).thenReturn(List.of(publishedSection, draftSection, orphanSection));
+        when(materialNodeRepository.findByKind(MaterialNodeKind.SECTION)).thenReturn(List.of(publishedSection, draftSection, orphanSection));
         when(materialNodeRepository.findByParentNodeId(10L)).thenReturn(List.of(publishedPart1, publishedPart2));
         when(materialNodeRepository.findByParentNodeId(20L)).thenReturn(List.of(draftPart1));
         when(materialNodeRepository.findByParentNodeId(30L)).thenReturn(List.of());
@@ -101,7 +101,7 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
 
         Material draftMaterial = materialWithRoot(200L, 20L, "Draft Material", null, MaterialStatus.DRAFT, createdAt, updatedAt);
 
-        when(materialNodeRepository.findByKind("SECTION")).thenReturn(List.of(publishedSection, draftSection, orphanSection));
+        when(materialNodeRepository.findByKind(MaterialNodeKind.SECTION)).thenReturn(List.of(publishedSection, draftSection, orphanSection));
         when(materialNodeRepository.findByParentNodeId(10L)).thenReturn(List.of());
         when(materialNodeRepository.findByParentNodeId(20L)).thenReturn(List.of(draftPart1, draftPart2));
         when(materialNodeRepository.findByParentNodeId(30L)).thenReturn(List.of());

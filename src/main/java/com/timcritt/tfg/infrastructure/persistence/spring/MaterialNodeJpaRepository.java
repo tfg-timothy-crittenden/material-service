@@ -1,5 +1,6 @@
 package com.timcritt.tfg.infrastructure.persistence.spring;
 
+import com.timcritt.tfg.domain.model.MaterialNodeKind;
 import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -11,7 +12,7 @@ public interface MaterialNodeJpaRepository extends JpaRepository<MaterialNodeJpa
     List<MaterialNodeJpaEntity> findByParentNodeId(Long parentNodeId);
 
 
-    List<MaterialNodeJpaEntity> findByKind(String kind);
+    List<MaterialNodeJpaEntity> findByKind(MaterialNodeKind kind);
 
     @Query(value = """
         SELECT mn.* FROM material_node mn
@@ -20,7 +21,7 @@ public interface MaterialNodeJpaRepository extends JpaRepository<MaterialNodeJpa
           AND mn.kind = :kind
           AND (:skillId IS NULL OR mn.skill_id = :skillId)
     """, nativeQuery = true)
-    List<MaterialNodeJpaEntity> findByKindAndExamFamilyIdAndSkillId(@Param("kind") String kind, @Param("examFamilyId") Long examFamilyId, @Param("skillId") Long skillId);
+    List<MaterialNodeJpaEntity> findByKindAndExamFamilyIdAndSkillId(@Param("kind") MaterialNodeKind kind, @Param("examFamilyId") Long examFamilyId, @Param("skillId") Long skillId);
 
     Optional<MaterialNodeJpaEntity> findByParentNodeIdAndDisplayOrder(Long parentNodeId, Integer displayOrder);
 

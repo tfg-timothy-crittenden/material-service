@@ -109,6 +109,37 @@ public class MaterialAsset {
         );
     }
 
+    public void replaceFile(
+            String storageKey,
+            String originalFilename,
+            String mimeType,
+            Long fileSizeBytes
+    ) {
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new IllegalArgumentException("storageKey cannot be blank");
+        }
+
+        if (fileSizeBytes != null && fileSizeBytes < 0) {
+            throw new IllegalArgumentException("fileSizeBytes cannot be negative");
+        }
+
+        this.storageKey = storageKey.trim();
+        this.originalFilename = normalize(originalFilename);
+        this.mimeType = normalize(mimeType);
+        this.fileSizeBytes = fileSizeBytes;
+
+        incrementVersion();
+        touch();
+    }
+
+    private void incrementVersion() {
+        this.version = version == null ? 1L : version + 1;
+    }
+
+    private void touch() {
+        this.updatedAt = OffsetDateTime.now();
+    }
+
     private static String normalize(String value) {
         return value == null ? null : value.trim();
     }

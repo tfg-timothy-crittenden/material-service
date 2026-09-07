@@ -140,7 +140,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         );
     }
 
-
     private MaterialNode createSectionRoot(Long materialId, String sectionTitle) {
         Instant now = Instant.now();
         MaterialNode sectionNode = MaterialNode.builder()
@@ -529,36 +528,41 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             MaterialAsset.Kind kind,
             int partNumber,
             Integer questionNumber,
-            List<String> uploadedKeys) {
+            List<String> uploadedKeys
+    ) {
+        String originalFilename = hasText(file.getOriginalFilename())
+                ? file.getOriginalFilename()
+                : "file";
 
-        String originalFilename = hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "file";
-        String newKey = buildSpeakingStorageKey(materialId, partNumber, kind, questionNumber);
-        storageRepositoryPort.uploadObject("toefl", newKey, new ByteArrayInputStream(file.getBytes()));
+        String newKey = buildSpeakingStorageKey(
+                materialId,
+                partNumber,
+                kind,
+                questionNumber
+        );
+
+        storageRepositoryPort.uploadObject(
+                "toefl",
+                newKey,
+                new ByteArrayInputStream(file.getBytes())
+        );
+
         uploadedKeys.add(newKey);
 
-        List<MaterialAsset> existing = materialAssetRepository.findByMaterialNodeId(materialNodeId);
-        MaterialAsset asset = existing.stream()
-                .filter(a -> a.getKind() == kind)
+        MaterialAsset asset = materialAssetRepository
+                .findByMaterialNodeId(materialNodeId)
+                .stream()
+                .filter(existing -> existing.getKind() == kind)
                 .findFirst()
                 .orElse(null);
 
         if (asset != null) {
-            asset = MaterialAsset.builder()
-                    .id(asset.getId())
-                    .materialNodeId(materialNodeId)
-                    .kind(asset.getKind())
-                    .storageKey(newKey)
-                    .originalFilename(originalFilename)
-                    .mimeType(file.getContentType())
-                    .fileSizeBytes(file.getSize())
-                    .title(asset.getTitle())
-                    .transcriptText(asset.getTranscriptText())
-                    .displayOrder(asset.getDisplayOrder())
-                    .metadata(asset.getMetadata())
-                    .version(asset.getVersion() == null ? 1L : asset.getVersion() + 1)
-                    .createdAt(asset.getCreatedAt())
-                    .updatedAt(OffsetDateTime.now())
-                    .build();
+            asset.replaceFile(
+                    newKey,
+                    originalFilename,
+                    file.getContentType(),
+                    file.getSize()
+            );
         } else {
             asset = MaterialAsset.create(
                     materialNodeId,
@@ -569,6 +573,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                     file.getSize()
             );
         }
+
         materialAssetRepository.save(asset);
     }
 

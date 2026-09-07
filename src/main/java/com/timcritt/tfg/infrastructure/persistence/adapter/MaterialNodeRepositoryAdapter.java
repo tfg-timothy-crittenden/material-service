@@ -2,6 +2,7 @@ package com.timcritt.tfg.infrastructure.persistence.adapter;
 
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.domain.model.MaterialNode;
+import com.timcritt.tfg.domain.model.MaterialNodeKind;
 import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeJpaEntity;
 import com.timcritt.tfg.infrastructure.persistence.mapper.MaterialNodeEntityMapper;
 import com.timcritt.tfg.infrastructure.persistence.spring.MaterialNodeJpaRepository;
@@ -49,7 +50,7 @@ public class MaterialNodeRepositoryAdapter implements MaterialNodeRepositoryPort
 
 
     @Override
-    public List<MaterialNode> findByKind(String kind) {
+    public List<MaterialNode> findByKind(MaterialNodeKind kind) {
         return jpaRepository.findByKind(kind)
                 .stream()
                 .map(MaterialNodeEntityMapper::toDomain)
@@ -57,7 +58,7 @@ public class MaterialNodeRepositoryAdapter implements MaterialNodeRepositoryPort
     }
 
     @Override
-    public List<MaterialNode> findByKindAndExamFamilyIdAndSkillId(String kind, Long examFamilyId, Long skillId) {
+    public List<MaterialNode> findByKindAndExamFamilyIdAndSkillId(MaterialNodeKind kind, Long examFamilyId, Long skillId) {
         return jpaRepository.findByKindAndExamFamilyIdAndSkillId(kind, examFamilyId, skillId)
                 .stream()
                 .map(MaterialNodeEntityMapper::toDomain)

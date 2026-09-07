@@ -91,7 +91,7 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
     private List<SpeakingSectionSummary> getSpeakingSectionSummariesByStatus(MaterialStatus status) {
         List<SpeakingSectionSummary> result = new ArrayList<>();
         // Find all SECTION nodes (root nodes for speaking sections)
-        List<MaterialNode> sections = materialNodeRepository.findByKind(MaterialNodeKind.SECTION.toString());
+        List<MaterialNode> sections = materialNodeRepository.findByKind(MaterialNodeKind.SECTION);
         for (MaterialNode section : sections) {
             // Find PART nodes under this section
             List<MaterialNode> parts = materialNodeRepository.findByParentNodeId(section.getId());
