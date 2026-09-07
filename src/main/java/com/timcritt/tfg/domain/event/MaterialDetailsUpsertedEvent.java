@@ -11,9 +11,6 @@ public class MaterialDetailsUpsertedEvent {
     private String description;
     private Instant updatedAt;
 
-    public MaterialDetailsUpsertedEvent() {
-    }
-
     public MaterialDetailsUpsertedEvent(Long materialId, Long version, String materialTitle, String part1Title, String part2Title, String description, Instant updatedAt) {
         this.materialId = materialId;
         this.version = version;

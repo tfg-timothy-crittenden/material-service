@@ -54,7 +54,7 @@ class MaterialRepositoryAdapterIntegrationTest {
         Material material = materialRepositoryAdapter.findById(10001L).orElseThrow();
 
         assertThat(material.getRoot()).isNotNull();
-        assertThat(material.getRoot().getId()).isEqualTo(20100L);
+        assertThat(material.getRootId()).isEqualTo(20100L);
         assertThat(material.getRoot().getChildren()).hasSize(2);
 
         MaterialNode part1 = material.getRoot().getChildren().get(0);

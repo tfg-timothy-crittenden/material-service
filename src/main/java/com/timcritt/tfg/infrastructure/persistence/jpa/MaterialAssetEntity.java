@@ -49,6 +49,7 @@ public class MaterialAssetEntity {
     private String transcriptText;
 
     @Column(name = "display_order", nullable = false)
+    @Builder.Default
     private Integer displayOrder = 0;
 
     @Column(columnDefinition = "jsonb", nullable = false)
@@ -56,6 +57,7 @@ public class MaterialAssetEntity {
     private Map<String, Object> metadata;
 
     @Column(nullable = false)
+    @Builder.Default
     private Long version = 0L;
 
     @Column(name = "created_at", nullable = false)

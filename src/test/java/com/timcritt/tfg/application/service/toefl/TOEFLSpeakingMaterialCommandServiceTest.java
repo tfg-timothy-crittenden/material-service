@@ -156,7 +156,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .orElseThrow();
 
         assertThat(root.getMaterialId()).isEqualTo(materialId);
-        assertThat(savedMaterials.get(1).getRoot().getId()).isEqualTo(root.getId());
+        assertThat(savedMaterials.get(1).getRootId()).isEqualTo(root.getId());
 
         MaterialNode part1 = savedNodes.stream()
                 .filter(node -> root.getId().equals(node.getParentNodeId()) && node.getDisplayOrder() == 0)

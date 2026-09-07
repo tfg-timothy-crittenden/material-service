@@ -7,9 +7,6 @@ public class MaterialDeletedEvent {
     private Long rootNodeId;
     private Instant deletedAt;
 
-    public MaterialDeletedEvent() {
-    }
-
     public MaterialDeletedEvent(Long materialId, Long rootNodeId, Instant deletedAt) {
         this.materialId = materialId;
         this.rootNodeId = rootNodeId;

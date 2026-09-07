@@ -5,8 +5,11 @@ import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialJpaEntity;
 
 public class MaterialEntityMapper {
     public static Material toDomain(MaterialJpaEntity entity) {
-        if (entity == null) return null;
-        Material material = Material.builder()
+        if (entity == null) {
+            return null;
+        }
+
+        return Material.builder()
                 .id(entity.getId())
                 .examFamilyId(entity.getExamFamilyId())
                 .title(entity.getTitle())
@@ -18,13 +21,6 @@ public class MaterialEntityMapper {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
-        if (entity.getMaterialNodeId() != null) {
-            material.attachRoot(MaterialNode.builder()
-                    .id(entity.getMaterialNodeId())
-                    .materialId(entity.getId())
-                    .build());
-        }
-        return material;
     }
 
     public static MaterialJpaEntity toEntity(Material material) {

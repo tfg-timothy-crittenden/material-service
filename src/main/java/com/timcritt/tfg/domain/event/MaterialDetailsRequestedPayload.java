@@ -11,9 +11,6 @@ public class MaterialDetailsRequestedPayload {
     private List<Long> materialIds;
     private Instant requestedAt;
 
-    public MaterialDetailsRequestedPayload() {
-    }
-
     public MaterialDetailsRequestedPayload(String requestId, List<Long> materialIds, Instant requestedAt) {
         this.requestId = requestId;
         this.materialIds = materialIds;
