@@ -3,6 +3,7 @@ package com.timcritt.tfg.domain.policy.toefl;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.MaterialNode;
+import com.timcritt.tfg.domain.model.MaterialNodeKind;
 import com.timcritt.tfg.domain.policy.MaterialPolicy;
 
 import java.util.Comparator;
@@ -35,7 +36,7 @@ public final class ToeflSpeaking2026MaterialPolicy implements MaterialPolicy {
         }
 
         List<MaterialNode> parts = root.getChildren().stream()
-                .filter(node -> "PART".equals(node.getKind()))
+                .filter(node -> node.getKind() == MaterialNodeKind.PART)
                 .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
                 .toList();
 
@@ -132,7 +133,7 @@ public final class ToeflSpeaking2026MaterialPolicy implements MaterialPolicy {
 
     private List<MaterialNode> questions(MaterialNode part) {
         return part.getChildren().stream()
-                .filter(node -> "ITEM".equals(node.getKind()))
+                .filter(node -> node.getKind() == MaterialNodeKind.ITEM)
                 .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
                 .toList();
     }

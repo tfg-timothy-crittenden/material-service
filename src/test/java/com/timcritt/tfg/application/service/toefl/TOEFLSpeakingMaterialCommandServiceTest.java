@@ -58,7 +58,23 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> {
             MaterialNode node = invocation.getArgument(0);
             if (node.getId() == null) {
-                node.setId(nodeIds.getAndIncrement());
+                node = MaterialNode.builder()
+                        .id(nodeIds.getAndIncrement())
+                        .materialId(node.getMaterialId())
+                        .parentNodeId(node.getParentNodeId())
+                        .kind(node.getKind())
+                        .title(node.getTitle())
+                        .displayOrder(node.getDisplayOrder())
+                        .skillId(node.getSkillId())
+                        .transcriptText(node.getTranscriptText())
+                        .responseMode(node.getResponseMode())
+                        .responseRequired(node.getResponseRequired())
+                        .scoringMode(node.getScoringMode())
+                        .config(node.getConfig())
+                        .version(node.getVersion())
+                        .createdAt(node.getCreatedAt())
+                        .updatedAt(node.getUpdatedAt())
+                        .build();
             }
             savedNodes.add(MaterialNode.builder()
                     .id(node.getId())
@@ -148,7 +164,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         );
 
         MaterialNode root = savedNodes.stream()
-                .filter(node -> "SECTION".equals(node.getKind()))
+                .filter(node -> node.getKind() == MaterialNodeKind.SECTION)
                 .findFirst()
                 .orElseThrow();
 
@@ -645,24 +661,22 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build();
 
         List<MaterialNode> part1Questions = List.of(
-                questionNode(part1Question1Id, part1NodeId, 0, "P1 Q1"),
-                questionNode(part1Question2Id, part1NodeId, 1, "P1 Q2"),
-                questionNode(part1Question3Id, part1NodeId, 2, "P1 Q3"),
-                questionNode(part1Question4Id, part1NodeId, 3, "P1 Q4"),
-                questionNode(part1Question5Id, part1NodeId, 4, "P1 Q5"),
-                questionNode(part1Question6Id, part1NodeId, 5, "P1 Q6"),
-                questionNode(part1Question7Id, part1NodeId, 6, "P1 Q7")
+                questionNode(materialId, part1Question1Id, part1NodeId, 0, "P1 Q1"),
+                questionNode(materialId, part1Question2Id, part1NodeId, 1, "P1 Q2"),
+                questionNode(materialId, part1Question3Id, part1NodeId, 2, "P1 Q3"),
+                questionNode(materialId, part1Question4Id, part1NodeId, 3, "P1 Q4"),
+                questionNode(materialId, part1Question5Id, part1NodeId, 4, "P1 Q5"),
+                questionNode(materialId, part1Question6Id, part1NodeId, 5, "P1 Q6"),
+                questionNode(materialId, part1Question7Id, part1NodeId, 6, "P1 Q7")
         );
 
         List<MaterialNode> part2Questions = List.of(
-                questionNode(part2Question1Id, part2NodeId, 0, "P2 Q1"),
-                questionNode(part2Question2Id, part2NodeId, 1, "P2 Q2"),
-                questionNode(part2Question3Id, part2NodeId, 2, "P2 Q3"),
-                questionNode(part2Question4Id, part2NodeId, 3, "P2 Q4")
+                questionNode(materialId, part2Question1Id, part2NodeId, 0, "P2 Q1"),
+                questionNode(materialId, part2Question2Id, part2NodeId, 1, "P2 Q2"),
+                questionNode(materialId, part2Question3Id, part2NodeId, 2, "P2 Q3"),
+                questionNode(materialId, part2Question4Id, part2NodeId, 3, "P2 Q4")
         );
 
-        part1Questions.forEach(question -> question.setMaterialId(materialId));
-        part2Questions.forEach(question -> question.setMaterialId(materialId));
         part1Questions.forEach(question -> question.addAsset(audioAsset(question.getId())));
         part2Questions.forEach(question -> question.addAsset(audioAsset(question.getId())));
         part1.addAsset(imageAsset(part1NodeId));
@@ -745,16 +759,11 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind(MaterialNodeKind.PART).title("Part 1").build();
         MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind(MaterialNodeKind.PART).title("Part 2").build();
 
-        MaterialNode part1Question = questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1");
-        part1Question.setMaterialId(materialId);
-        MaterialNode part2Question1 = questionNode(3008L, part2NodeId, 0, "P2 Q1");
-        part2Question1.setMaterialId(materialId);
-        MaterialNode part2Question2 = questionNode(3009L, part2NodeId, 1, "P2 Q2");
-        part2Question2.setMaterialId(materialId);
-        MaterialNode part2Question3 = questionNode(3010L, part2NodeId, 2, "P2 Q3");
-        part2Question3.setMaterialId(materialId);
-        MaterialNode part2Question4 = questionNode(3011L, part2NodeId, 3, "P2 Q4");
-        part2Question4.setMaterialId(materialId);
+        MaterialNode part1Question = questionNode(materialId, part1QuestionId, part1NodeId, 0, "P1 Q1");
+        MaterialNode part2Question1 = questionNode(materialId, 3008L, part2NodeId, 0, "P2 Q1");
+        MaterialNode part2Question2 = questionNode(materialId, 3009L, part2NodeId, 1, "P2 Q2");
+        MaterialNode part2Question3 = questionNode(materialId, 3010L, part2NodeId, 2, "P2 Q3");
+        MaterialNode part2Question4 = questionNode(materialId, 3011L, part2NodeId, 3, "P2 Q4");
 
         part1.addChild(part1Question);
         part2.addChild(part2Question1);
@@ -769,12 +778,12 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
         when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
         when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1")));
+        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(questionNode(materialId, part1QuestionId, part1NodeId, 0, "P1 Q1")));
         when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of(
-                questionNode(3008L, part2NodeId, 0, "P2 Q1"),
-                questionNode(3009L, part2NodeId, 1, "P2 Q2"),
-                questionNode(3010L, part2NodeId, 2, "P2 Q3"),
-                questionNode(3011L, part2NodeId, 3, "P2 Q4")
+                questionNode(materialId, 3008L, part2NodeId, 0, "P2 Q1"),
+                questionNode(materialId, 3009L, part2NodeId, 1, "P2 Q2"),
+                questionNode(materialId, 3010L, part2NodeId, 2, "P2 Q3"),
+                questionNode(materialId, 3011L, part2NodeId, 3, "P2 Q4")
         ));
         when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
         when(materialAssetRepository.findByMaterialNodeId(part1QuestionId)).thenReturn(List.of(audioAsset()));
@@ -811,29 +820,25 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind(MaterialNodeKind.PART).title("Part 2").build();
 
         List<MaterialNode> part1Questions = List.of(
-                questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1"),
-                questionNode(3021L, part1NodeId, 1, "P1 Q2"),
-                questionNode(3022L, part1NodeId, 2, "P1 Q3"),
-                questionNode(3023L, part1NodeId, 3, "P1 Q4"),
-                questionNode(3024L, part1NodeId, 4, "P1 Q5"),
-                questionNode(3025L, part1NodeId, 5, "P1 Q6"),
-                questionNode(3026L, part1NodeId, 6, "P1 Q7")
+                questionNode(materialId, part1QuestionId, part1NodeId, 0, "P1 Q1"),
+                questionNode(materialId, 3021L, part1NodeId, 1, "P1 Q2"),
+                questionNode(materialId, 3022L, part1NodeId, 2, "P1 Q3"),
+                questionNode(materialId, 3023L, part1NodeId, 3, "P1 Q4"),
+                questionNode(materialId, 3024L, part1NodeId, 4, "P1 Q5"),
+                questionNode(materialId, 3025L, part1NodeId, 5, "P1 Q6"),
+                questionNode(materialId, 3026L, part1NodeId, 6, "P1 Q7")
         );
-        part1Questions.forEach(question -> question.setMaterialId(materialId));
         for (int i = 1; i < part1Questions.size(); i++) {
             part1Questions.get(i).addAsset(audioAsset(part1Questions.get(i).getId()));
         }
 
         List<MaterialNode> part2Questions = List.of(
-                questionNode(3017L, part2NodeId, 0, "P2 Q1"),
-                questionNode(3018L, part2NodeId, 1, "P2 Q2"),
-                questionNode(3019L, part2NodeId, 2, "P2 Q3"),
-                questionNode(3020L, part2NodeId, 3, "P2 Q4")
+                questionNode(materialId, 3017L, part2NodeId, 0, "P2 Q1"),
+                questionNode(materialId, 3018L, part2NodeId, 1, "P2 Q2"),
+                questionNode(materialId, 3019L, part2NodeId, 2, "P2 Q3"),
+                questionNode(materialId, 3020L, part2NodeId, 3, "P2 Q4")
         );
-        part2Questions.forEach(question -> {
-            question.setMaterialId(materialId);
-            question.addAsset(audioAsset(question.getId()));
-        });
+        part2Questions.forEach(question -> question.addAsset(audioAsset(question.getId())));
 
         part1.addAsset(imageAsset(part1NodeId));
         part1Questions.forEach(part1::addChild);
@@ -889,28 +894,22 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind(MaterialNodeKind.PART).title("Part 2").build();
 
         List<MaterialNode> part1Questions = List.of(
-                questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1"),
-                questionNode(3026L, part1NodeId, 1, "P1 Q2"),
-                questionNode(3027L, part1NodeId, 2, "P1 Q3"),
-                questionNode(3028L, part1NodeId, 3, "P1 Q4"),
-                questionNode(3029L, part1NodeId, 4, "P1 Q5"),
-                questionNode(3030L, part1NodeId, 5, "P1 Q6"),
-                questionNode(3031L, part1NodeId, 6, "P1 Q7")
+                questionNode(materialId, part1QuestionId, part1NodeId, 0, "P1 Q1"),
+                questionNode(materialId, 3026L, part1NodeId, 1, "P1 Q2"),
+                questionNode(materialId, 3027L, part1NodeId, 2, "P1 Q3"),
+                questionNode(materialId, 3028L, part1NodeId, 3, "P1 Q4"),
+                questionNode(materialId, 3029L, part1NodeId, 4, "P1 Q5"),
+                questionNode(materialId, 3030L, part1NodeId, 5, "P1 Q6"),
+                questionNode(materialId, 3031L, part1NodeId, 6, "P1 Q7")
         );
-        part1Questions.forEach(question -> {
-            question.setMaterialId(materialId);
-            question.addAsset(audioAsset(question.getId()));
-        });
+        part1Questions.forEach(question -> question.addAsset(audioAsset(question.getId())));
 
         List<MaterialNode> part2Questions = List.of(
-                questionNode(3032L, part2NodeId, 0, "P2 Q1"),
-                questionNode(3033L, part2NodeId, 1, "P2 Q2"),
-                questionNode(3034L, part2NodeId, 2, "P2 Q3")
+                questionNode(materialId, 3032L, part2NodeId, 0, "P2 Q1"),
+                questionNode(materialId, 3033L, part2NodeId, 1, "P2 Q2"),
+                questionNode(materialId, 3034L, part2NodeId, 2, "P2 Q3")
         );
-        part2Questions.forEach(question -> {
-            question.setMaterialId(materialId);
-            question.addAsset(audioAsset(question.getId()));
-        });
+        part2Questions.forEach(question -> question.addAsset(audioAsset(question.getId())));
 
         part1.addAsset(imageAsset(part1NodeId));
         part1Questions.forEach(part1::addChild);
@@ -944,9 +943,10 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         verify(materialRepository, never()).save(any(Material.class));
     }
 
-    private static MaterialNode questionNode(Long id, Long parentNodeId, int displayOrder, String transcriptText) {
+    private static MaterialNode questionNode(Long materialId, Long id, Long parentNodeId, int displayOrder, String transcriptText) {
         return MaterialNode.builder()
                 .id(id)
+                .materialId(materialId)
                 .parentNodeId(parentNodeId)
                 .kind(MaterialNodeKind.ITEM)
                 .displayOrder(displayOrder)
