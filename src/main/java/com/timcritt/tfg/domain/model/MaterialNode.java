@@ -105,6 +105,21 @@ public class MaterialNode {
         touch();
     }
 
+    public void updateConfig(Map<String, Object> config) {
+        Map<String, Object> normalized =
+                config == null
+                        ? new HashMap<>()
+                        : new HashMap<>(config);
+
+        if (Objects.equals(this.config, normalized)) {
+            return;
+        }
+
+        this.config = normalized;
+        incrementVersion();
+        touch();
+    }
+
     private void incrementVersion() {
         this.version = version == null ? 1L : version + 1;
     }
@@ -174,6 +189,12 @@ public class MaterialNode {
         return new Builder();
     }
 
+    public Map<String, Object> getConfig() {
+        return config == null
+                ? Collections.emptyMap()
+                : Collections.unmodifiableMap(config);
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getMaterialId() { return materialId; }
@@ -194,7 +215,7 @@ public class MaterialNode {
     public String getStimulusText() { return stimulusText; }
 
     public String getTranscriptText() { return transcriptText; }
-    public void setTranscriptText(String transcriptText) { this.transcriptText = transcriptText; }
+
     public String getExplanationText() { return explanationText; }
 
     public Integer getTimeLimitSeconds() { return timeLimitSeconds; }
@@ -219,12 +240,10 @@ public class MaterialNode {
 
     public Double getPassingScore() { return passingScore; }
 
-    public Map<String, Object> getConfig() { return config; }
-    public void setConfig(Map<String, Object> config) { this.config = config; }
     public Long getVersion() { return version; }
 
     public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
     public Instant getUpdatedAt() { return updatedAt; }
 
 

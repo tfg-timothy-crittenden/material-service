@@ -364,8 +364,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             }
             if (materialDetailsChanged) {
                 materialRepository.save(material);
-                Instant updatedAt = material.getUpdatedAt();
-
                 materialNodeRepository.save(rootNode);
             }
 
@@ -501,11 +499,11 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
         boolean dirty = false;
         if (hasText(q.getTranscriptText())) {
-            questionNode.setTranscriptText(q.getTranscriptText());
+            questionNode.updateTranscriptText(q.getTranscriptText());
             dirty = true;
         }
         if (q.getConfig() != null) {
-            questionNode.setConfig(q.getConfig());
+            questionNode.updateConfig(q.getConfig());
             dirty = true;
         }
         if (dirty) {
