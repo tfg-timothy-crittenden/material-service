@@ -9,10 +9,7 @@ import com.timcritt.tfg.application.port.outbound.*;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingMaterialCommandUseCase;
-import com.timcritt.tfg.domain.model.Material;
-import com.timcritt.tfg.domain.model.MaterialAsset;
-import com.timcritt.tfg.domain.model.MaterialNode;
-import com.timcritt.tfg.domain.model.MaterialStatus;
+import com.timcritt.tfg.domain.model.*;
 import com.timcritt.tfg.domain.policy.toefl.ToeflSpeaking2026MaterialPolicy;
 
 import java.io.ByteArrayInputStream;
@@ -149,7 +146,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 .id(null)
                 .materialId(materialId)
                 .parentNodeId(null)
-                .kind("SECTION")
+                .kind(MaterialNodeKind.SECTION)
                 .title(sectionTitle)
                 .displayOrder(0)
                 .skillId(TOEFL_SKILL_ID)
@@ -187,7 +184,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 .id(null)
                 .materialId(materialId)
                 .parentNodeId(parentNodeId)
-                .kind("PART")
+                .kind(MaterialNodeKind.PART)
                 .title(title)
                 .displayOrder(displayOrder)
                 .skillId(TOEFL_SKILL_ID)
@@ -252,7 +249,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                     .id(null)
                     .materialId(materialId)
                     .parentNodeId(partNodeId)
-                    .kind("ITEM")
+                    .kind(MaterialNodeKind.ITEM)
                     .title(title)
                     .displayOrder(questionOrder)
                     .skillId(TOEFL_SKILL_ID)
@@ -284,7 +281,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                     .id(null)
                     .materialId(materialId)
                     .parentNodeId(partNodeId)
-                    .kind("ITEM")
+                    .kind(MaterialNodeKind.ITEM)
                     .title(title)
                     .displayOrder(i)
                     .skillId(TOEFL_SKILL_ID)
@@ -358,7 +355,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             // ── Update material text fields ──────────────────────────────────────
             if (hasText(command.getMaterialTitle()) && !Objects.equals(material.getTitle(), command.getMaterialTitle())) {
                 material.updateDetails(command.getMaterialTitle(), command.getMaterialDescription());
-                rootNode.setTitle(command.getMaterialTitle());
+                rootNode.updateTitle(command.getMaterialTitle());
                 titlesChanged = true;
                 materialDetailsChanged = true;
             } else if (command.getMaterialDescription() != null) {
@@ -368,8 +365,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             if (materialDetailsChanged) {
                 materialRepository.save(material);
                 Instant updatedAt = material.getUpdatedAt();
-                rootNode.setUpdatedAt(updatedAt);
-                rootNode.setVersion(rootNode.getVersion() + 1);
+
                 materialNodeRepository.save(rootNode);
             }
 
@@ -378,10 +374,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                     .orElseThrow(() -> new IllegalArgumentException("Part 1 node not found for section: " + command.getMaterialId()));
 
             if (hasText(command.getPartTitle()) && !Objects.equals(part1.getTitle(), command.getPartTitle())) {
-                part1.setTitle(command.getPartTitle());
+                part1.updateTitle(command.getPartTitle());
                 titlesChanged = true;
-                part1.setUpdatedAt(Instant.now());
-                part1.setVersion(part1.getVersion() + 1);
+
                 materialNodeRepository.save(part1);
             }
 
@@ -414,10 +409,9 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                                 + ". Cannot update a part that does not exist."));
 
                 if (hasText(command.getPart2Title()) && !Objects.equals(part2.getTitle(), command.getPart2Title())) {
-                    part2.setTitle(command.getPart2Title());
+                    part2.updateTitle(command.getPart2Title());
                     titlesChanged = true;
-                    part2.setUpdatedAt(Instant.now());
-                    part2.setVersion(part2.getVersion() + 1);
+
                     materialNodeRepository.save(part2);
                 }
 
@@ -515,8 +509,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             dirty = true;
         }
         if (dirty) {
-            questionNode.setUpdatedAt(Instant.now());
-            questionNode.setVersion(questionNode.getVersion() + 1);
+
             materialNodeRepository.save(questionNode);
         }
 

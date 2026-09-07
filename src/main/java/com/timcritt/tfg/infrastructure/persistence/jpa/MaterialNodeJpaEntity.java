@@ -1,5 +1,6 @@
 package com.timcritt.tfg.infrastructure.persistence.jpa;
 
+import com.timcritt.tfg.domain.model.MaterialNodeKind;
 import com.timcritt.tfg.infrastructure.persistence.auxiliary.MapToJsonConverter;
 import jakarta.persistence.*;
 import lombok.*;
@@ -25,7 +26,7 @@ public class MaterialNodeJpaEntity {
     private Long parentNodeId;
 
     @Column(name = "kind", nullable = false)
-    private String kind;
+    private MaterialNodeKind kind;
 
     @Column(name = "title")
     private String title;

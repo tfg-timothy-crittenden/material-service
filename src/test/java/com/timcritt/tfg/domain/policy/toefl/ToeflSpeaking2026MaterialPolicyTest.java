@@ -3,6 +3,7 @@ package com.timcritt.tfg.domain.policy.toefl;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialAsset;
 import com.timcritt.tfg.domain.model.MaterialNode;
+import com.timcritt.tfg.domain.model.MaterialNodeKind;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -69,7 +70,7 @@ class ToeflSpeaking2026MaterialPolicyTest {
                 .id(20100L)
                 .materialId(materialId)
                 .parentNodeId(null)
-                .kind("SECTION")
+                .kind(MaterialNodeKind.SECTION)
                 .title("TOEFL Speaking Test 1")
                 .displayOrder(0)
                 .responseMode("NONE")
@@ -148,7 +149,7 @@ class ToeflSpeaking2026MaterialPolicyTest {
                 .id(20100L)
                 .materialId(materialId)
                 .parentNodeId(null)
-                .kind("SECTION")
+                .kind(MaterialNodeKind.SECTION)
                 .title("TOEFL Speaking Test 1")
                 .displayOrder(0)
                 .responseMode("NONE")
@@ -186,7 +187,7 @@ class ToeflSpeaking2026MaterialPolicyTest {
                 .id(id)
                 .materialId(materialId)
                 .parentNodeId(parentNodeId)
-                .kind("PART")
+                .kind(MaterialNodeKind.PART)
                 .title(title)
                 .displayOrder(displayOrder)
                 .responseMode("NONE")
@@ -204,7 +205,7 @@ class ToeflSpeaking2026MaterialPolicyTest {
                 .id(id)
                 .materialId(materialId)
                 .parentNodeId(parentNodeId)
-                .kind("ITEM")
+                .kind(MaterialNodeKind.ITEM)
                 .title("Question " + (displayOrder + 1))
                 .displayOrder(displayOrder)
                 .transcriptText(transcriptText)

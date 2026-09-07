@@ -8,10 +8,7 @@ import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateComma
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUploadCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
-import com.timcritt.tfg.domain.model.MaterialAsset;
-import com.timcritt.tfg.domain.model.Material;
-import com.timcritt.tfg.domain.model.MaterialNode;
-import com.timcritt.tfg.domain.model.MaterialStatus;
+import com.timcritt.tfg.domain.model.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -625,7 +622,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         MaterialNode root = MaterialNode.builder()
                 .id(rootNodeId)
                 .materialId(materialId)
-                .kind("SECTION")
+                .kind(MaterialNodeKind.SECTION)
                 .title("Complete speaking section")
                 .build();
 
@@ -634,7 +631,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .materialId(materialId)
                 .parentNodeId(rootNodeId)
                 .displayOrder(0)
-                .kind("PART")
+                .kind(MaterialNodeKind.PART)
                 .title("Part 1")
                 .build();
 
@@ -643,7 +640,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .materialId(materialId)
                 .parentNodeId(rootNodeId)
                 .displayOrder(1)
-                .kind("PART")
+                .kind(MaterialNodeKind.PART)
                 .title("Part 2")
                 .build();
 
@@ -744,9 +741,9 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build();
         material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
 
-        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind("SECTION").title("Complete speaking section").build();
-        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind("PART").title("Part 1").build();
-        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind("PART").title("Part 2").build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind(MaterialNodeKind.SECTION).title("Complete speaking section").build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind(MaterialNodeKind.PART).title("Part 1").build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind(MaterialNodeKind.PART).title("Part 2").build();
 
         MaterialNode part1Question = questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1");
         part1Question.setMaterialId(materialId);
@@ -809,9 +806,9 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build();
         material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
 
-        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind("SECTION").title("Complete speaking section").build();
-        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind("PART").title("Part 1").build();
-        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind("PART").title("Part 2").build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind(MaterialNodeKind.SECTION).title("Complete speaking section").build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind(MaterialNodeKind.PART).title("Part 1").build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind(MaterialNodeKind.PART).title("Part 2").build();
 
         List<MaterialNode> part1Questions = List.of(
                 questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1"),
@@ -887,9 +884,9 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build();
         material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
 
-        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind("SECTION").title("Complete speaking section").build();
-        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind("PART").title("Part 1").build();
-        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind("PART").title("Part 2").build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId).kind(MaterialNodeKind.SECTION).title("Complete speaking section").build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(0).kind(MaterialNodeKind.PART).title("Part 1").build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId).displayOrder(1).kind(MaterialNodeKind.PART).title("Part 2").build();
 
         List<MaterialNode> part1Questions = List.of(
                 questionNode(part1QuestionId, part1NodeId, 0, "P1 Q1"),
@@ -951,7 +948,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         return MaterialNode.builder()
                 .id(id)
                 .parentNodeId(parentNodeId)
-                .kind("ITEM")
+                .kind(MaterialNodeKind.ITEM)
                 .displayOrder(displayOrder)
                 .transcriptText(transcriptText)
                 .build();

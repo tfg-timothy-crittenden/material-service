@@ -6,6 +6,7 @@ import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialNode;
+import com.timcritt.tfg.domain.model.MaterialNodeKind;
 import com.timcritt.tfg.domain.model.MaterialStatus;
 import org.junit.jupiter.api.Test;
 
@@ -31,9 +32,9 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
 
     @Test
     void getAllSpeakingSectionSummaries_returnsOnlyPublishedMaterials() {
-        MaterialNode publishedSection = MaterialNode.builder().id(10L).kind("SECTION").title("Published Section").build();
-        MaterialNode draftSection = MaterialNode.builder().id(20L).kind("SECTION").title("Draft Section").build();
-        MaterialNode orphanSection = MaterialNode.builder().id(30L).kind("SECTION").title("Orphan Section").build();
+        MaterialNode publishedSection = MaterialNode.builder().id(10L).kind(MaterialNodeKind.SECTION).title("Published Section").build();
+        MaterialNode draftSection = MaterialNode.builder().id(20L).kind(MaterialNodeKind.SECTION).title("Draft Section").build();
+        MaterialNode orphanSection = MaterialNode.builder().id(30L).kind(MaterialNodeKind.SECTION).title("Orphan Section").build();
 
         MaterialNode publishedPart1 = MaterialNode.builder().id(11L).parentNodeId(10L).displayOrder(0).title("Part 1").build();
         MaterialNode publishedPart2 = MaterialNode.builder().id(12L).parentNodeId(10L).displayOrder(1).title("Part 2").build();
@@ -86,9 +87,9 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
 
     @Test
     void getDraftSpeakingSectionSummaries_returnsOnlyDraftMaterials() {
-        MaterialNode publishedSection = MaterialNode.builder().id(10L).kind("SECTION").title("Published Section").build();
-        MaterialNode draftSection = MaterialNode.builder().id(20L).kind("SECTION").title("Draft Section").build();
-        MaterialNode orphanSection = MaterialNode.builder().id(30L).kind("SECTION").title("Orphan Section").build();
+        MaterialNode publishedSection = MaterialNode.builder().id(10L).kind(MaterialNodeKind.SECTION).title("Published Section").build();
+        MaterialNode draftSection = MaterialNode.builder().id(20L).kind(MaterialNodeKind.SECTION).title("Draft Section").build();
+        MaterialNode orphanSection = MaterialNode.builder().id(30L).kind(MaterialNodeKind.SECTION).title("Orphan Section").build();
 
         MaterialNode draftPart1 = MaterialNode.builder().id(21L).parentNodeId(20L).displayOrder(0).title("Draft Part 1").build();
         MaterialNode draftPart2 = MaterialNode.builder().id(22L).parentNodeId(20L).displayOrder(1).title("Draft Part 2").build();
@@ -145,7 +146,7 @@ class TOEFLSpeakingNavigationUseCaseServiceTest {
         Long part1Id = 501L;
 
         Material material = materialWithRoot(materialId, sectionId, "Draft Material", "desc", MaterialStatus.DRAFT, null, null);
-        MaterialNode section = MaterialNode.builder().id(sectionId).kind("SECTION").title("Draft Material").build();
+        MaterialNode section = MaterialNode.builder().id(sectionId).kind(MaterialNodeKind.SECTION).title("Draft Material").build();
         MaterialNode part1 = MaterialNode.builder().id(part1Id).parentNodeId(sectionId).displayOrder(0).title("Part 1").build();
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));

@@ -12,7 +12,7 @@ public final class MaterialNodeWithAssetsDtoMapper {
         return MaterialNodeWithAssetsDto.builder()
                 .id(src.getNode().getId())
                 .parentNodeId(src.getNode().getParentNodeId())
-                .kind(src.getNode().getKind())
+                .kind(src.getNode().getKind().name())
                 .title(src.getNode().getTitle())
                 .displayOrder(src.getNode().getDisplayOrder())
                 .transcriptText(src.getNode().getTranscriptText())

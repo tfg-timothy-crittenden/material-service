@@ -9,7 +9,7 @@ public class MaterialNode {
     private Long id;
     private Long materialId;
     private Long parentNodeId;
-    private String kind;
+    private MaterialNodeKind kind;
     private String title;
     private Integer displayOrder;
     private Long skillId;
@@ -75,11 +75,49 @@ public class MaterialNode {
         assets.add(asset);
     }
 
+    public void updateTitle(String title) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title cannot be blank");
+        }
+
+        String normalized = title.trim();
+
+        if (Objects.equals(this.title, normalized)) {
+            return;
+        }
+
+        this.title = normalized;
+        incrementVersion();
+        touch();
+    }
+
+    public void updateTranscriptText(String transcriptText) {
+        String normalized = transcriptText == null
+                ? null
+                : transcriptText.trim();
+
+        if (Objects.equals(this.transcriptText, normalized)) {
+            return;
+        }
+
+        this.transcriptText = normalized;
+        incrementVersion();
+        touch();
+    }
+
+    private void incrementVersion() {
+        this.version = version == null ? 1L : version + 1;
+    }
+
+    private void touch() {
+        this.updatedAt = Instant.now();
+    }
+
     public MaterialNode(
             Long id,
             Long materialId,
             Long parentNodeId,
-            String kind,
+            MaterialNodeKind kind,
             String title,
             Integer displayOrder,
             Long skillId,
@@ -142,60 +180,59 @@ public class MaterialNode {
     public void setMaterialId(Long materialId) { this.materialId = materialId; }
     public Long getParentNodeId() { return parentNodeId; }
     public void setParentNodeId(Long parentNodeId) { this.parentNodeId = parentNodeId; }
-    public String getKind() { return kind; }
-    public void setKind(String kind) { this.kind = kind; }
+    public MaterialNodeKind getKind() { return kind; }
+    public void setKind(MaterialNodeKind kind) { this.kind = kind; }
     public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
     public Integer getDisplayOrder() { return displayOrder; }
     public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
     public Long getSkillId() { return skillId; }
-    public void setSkillId(Long skillId) { this.skillId = skillId; }
+
     public Long getTaskTypeId() { return taskTypeId; }
-    public void setTaskTypeId(Long taskTypeId) { this.taskTypeId = taskTypeId; }
+
     public String getInstructions() { return instructions; }
-    public void setInstructions(String instructions) { this.instructions = instructions; }
+
     public String getStimulusText() { return stimulusText; }
-    public void setStimulusText(String stimulusText) { this.stimulusText = stimulusText; }
+
     public String getTranscriptText() { return transcriptText; }
     public void setTranscriptText(String transcriptText) { this.transcriptText = transcriptText; }
     public String getExplanationText() { return explanationText; }
-    public void setExplanationText(String explanationText) { this.explanationText = explanationText; }
+
     public Integer getTimeLimitSeconds() { return timeLimitSeconds; }
-    public void setTimeLimitSeconds(Integer timeLimitSeconds) { this.timeLimitSeconds = timeLimitSeconds; }
+
     public Integer getPrepTimeSeconds() { return prepTimeSeconds; }
-    public void setPrepTimeSeconds(Integer prepTimeSeconds) { this.prepTimeSeconds = prepTimeSeconds; }
+
     public String getResponseMode() { return responseMode; }
-    public void setResponseMode(String responseMode) { this.responseMode = responseMode; }
+
     public Boolean getResponseRequired() { return responseRequired; }
-    public void setResponseRequired(Boolean responseRequired) { this.responseRequired = responseRequired; }
+
     public Integer getMinDurationSeconds() { return minDurationSeconds; }
-    public void setMinDurationSeconds(Integer minDurationSeconds) { this.minDurationSeconds = minDurationSeconds; }
+
     public Integer getMaxDurationSeconds() { return maxDurationSeconds; }
-    public void setMaxDurationSeconds(Integer maxDurationSeconds) { this.maxDurationSeconds = maxDurationSeconds; }
+
     public Integer getMinWordCount() { return minWordCount; }
-    public void setMinWordCount(Integer minWordCount) { this.minWordCount = minWordCount; }
+
     public Integer getMaxWordCount() { return maxWordCount; }
-    public void setMaxWordCount(Integer maxWordCount) { this.maxWordCount = maxWordCount; }
+
     public String getScoringMode() { return scoringMode; }
-    public void setScoringMode(String scoringMode) { this.scoringMode = scoringMode; }
+
     public Double getMaxScore() { return maxScore; }
-    public void setMaxScore(Double maxScore) { this.maxScore = maxScore; }
+
     public Double getPassingScore() { return passingScore; }
-    public void setPassingScore(Double passingScore) { this.passingScore = passingScore; }
+
     public Map<String, Object> getConfig() { return config; }
     public void setConfig(Map<String, Object> config) { this.config = config; }
     public Long getVersion() { return version; }
-    public void setVersion(Long version) { this.version = version; }
+
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
 
     public static class Builder {
         private Long id;
         private Long materialId;
         private Long parentNodeId;
-        private String kind;
+        private MaterialNodeKind kind;
         private String title;
         private Integer displayOrder;
         private Long skillId;
@@ -223,7 +260,7 @@ public class MaterialNode {
         public Builder id(Long id) { this.id = id; return this; }
         public Builder materialId(Long materialId) { this.materialId = materialId; return this; }
         public Builder parentNodeId(Long parentNodeId) { this.parentNodeId = parentNodeId; return this; }
-        public Builder kind(String kind) { this.kind = kind; return this; }
+        public Builder kind(MaterialNodeKind kind) { this.kind = kind; return this; }
         public Builder title(String title) { this.title = title; return this; }
         public Builder displayOrder(Integer displayOrder) { this.displayOrder = displayOrder; return this; }
         public Builder skillId(Long skillId) { this.skillId = skillId; return this; }

@@ -8,10 +8,7 @@ import com.timcritt.tfg.application.port.inbound.TOEFLSpeakingNavigationUseCase;
 import com.timcritt.tfg.application.port.outbound.MaterialNodeRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
 import com.timcritt.tfg.application.port.outbound.MaterialAssetRepositoryPort;
-import com.timcritt.tfg.domain.model.Material;
-import com.timcritt.tfg.domain.model.MaterialNode;
-import com.timcritt.tfg.domain.model.MaterialAsset;
-import com.timcritt.tfg.domain.model.MaterialStatus;
+import com.timcritt.tfg.domain.model.*;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -94,7 +91,7 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
     private List<SpeakingSectionSummary> getSpeakingSectionSummariesByStatus(MaterialStatus status) {
         List<SpeakingSectionSummary> result = new ArrayList<>();
         // Find all SECTION nodes (root nodes for speaking sections)
-        List<MaterialNode> sections = materialNodeRepository.findByKind("SECTION");
+        List<MaterialNode> sections = materialNodeRepository.findByKind(MaterialNodeKind.SECTION.toString());
         for (MaterialNode section : sections) {
             // Find PART nodes under this section
             List<MaterialNode> parts = materialNodeRepository.findByParentNodeId(section.getId());
@@ -144,7 +141,7 @@ public class TOEFLSpeakingNavigationUseCaseService implements TOEFLSpeakingNavig
     private List<SpeakingQuestionEditResult> toQuestionEditList(MaterialNode partNode) {
         return materialNodeRepository.findByParentNodeId(partNode.getId()).stream()
                 // Question nodes are currently persisted as ITEM; keep QUESTION for backward compatibility.
-                .filter(node -> "ITEM".equalsIgnoreCase(node.getKind()) || "QUESTION".equalsIgnoreCase(node.getKind()))
+                .filter(node -> "ITEM".equalsIgnoreCase(node.getKind().toString()) || "QUESTION".equalsIgnoreCase(node.getKind().toString()))
                 .sorted(Comparator.comparing(MaterialNode::getDisplayOrder,
                         Comparator.nullsLast(Integer::compareTo)))
                 .map(node -> SpeakingQuestionEditResult.builder()
