@@ -71,6 +71,7 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         createQuestions(savedMaterial.getId(), part2Node.getId(), command.getPart2Questions(), 2);
         createMissingPlaceholderQuestions(savedMaterial.getId(), part2Node.getId(), safeSize(command.getPart2Questions()), PART_2_QUESTION_COUNT);
 
+        //Return the ID assigned by the DB
         return savedMaterial.getId();
     }
 
@@ -222,19 +223,14 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
         String originalFilename = hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "file";
 
-        MaterialAsset asset = new MaterialAsset();
-        asset.setMaterialNodeId(materialNodeId);
-        asset.setKind(kind);
-        asset.setStorageKey(storageKey);
-        asset.setOriginalFilename(originalFilename);
-        asset.setMimeType(file.getContentType());
-        asset.setFileSizeBytes(file.getSize());
-        asset.setDisplayOrder(0);
-        asset.setVersion(0L);
-        asset.setMetadata(new HashMap<>());
-        OffsetDateTime now = OffsetDateTime.now();
-        asset.setCreatedAt(now);
-        asset.setUpdatedAt(now);
+        MaterialAsset asset = MaterialAsset.create(
+                materialNodeId,
+                kind,
+                storageKey,
+                originalFilename,
+                file.getContentType(),
+                file.getSize()
+        );
         materialAssetRepository.save(asset);
     }
 
@@ -547,26 +543,31 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 .orElse(null);
 
         if (asset != null) {
-            asset.setStorageKey(newKey);
-            asset.setOriginalFilename(originalFilename);
-            asset.setMimeType(file.getContentType());
-            asset.setFileSizeBytes(file.getSize());
-            asset.setVersion(asset.getVersion() + 1);
-            asset.setUpdatedAt(OffsetDateTime.now());
+            asset = MaterialAsset.builder()
+                    .id(asset.getId())
+                    .materialNodeId(materialNodeId)
+                    .kind(asset.getKind())
+                    .storageKey(newKey)
+                    .originalFilename(originalFilename)
+                    .mimeType(file.getContentType())
+                    .fileSizeBytes(file.getSize())
+                    .title(asset.getTitle())
+                    .transcriptText(asset.getTranscriptText())
+                    .displayOrder(asset.getDisplayOrder())
+                    .metadata(asset.getMetadata())
+                    .version(asset.getVersion() == null ? 1L : asset.getVersion() + 1)
+                    .createdAt(asset.getCreatedAt())
+                    .updatedAt(OffsetDateTime.now())
+                    .build();
         } else {
-            asset = new MaterialAsset();
-            asset.setMaterialNodeId(materialNodeId);
-            asset.setKind(kind);
-            asset.setStorageKey(newKey);
-            asset.setOriginalFilename(originalFilename);
-            asset.setMimeType(file.getContentType());
-            asset.setFileSizeBytes(file.getSize());
-            asset.setDisplayOrder(0);
-            asset.setVersion(0L);
-            asset.setMetadata(new HashMap<>());
-            OffsetDateTime now = OffsetDateTime.now();
-            asset.setCreatedAt(now);
-            asset.setUpdatedAt(now);
+            asset = MaterialAsset.create(
+                    materialNodeId,
+                    kind,
+                    newKey,
+                    originalFilename,
+                    file.getContentType(),
+                    file.getSize()
+            );
         }
         materialAssetRepository.save(asset);
     }

@@ -25,6 +25,7 @@ public class MaterialNodeJpaEntity {
     @Column(name = "parent_node_id")
     private Long parentNodeId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "kind", nullable = false)
     private MaterialNodeKind kind;
 

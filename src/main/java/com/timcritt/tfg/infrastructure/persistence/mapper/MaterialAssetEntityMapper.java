@@ -7,22 +7,22 @@ import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeJpaEntity;
 public class MaterialAssetEntityMapper {
     public static MaterialAsset toDomain(MaterialAssetEntity entity) {
         if (entity == null) return null;
-        MaterialAsset asset = new MaterialAsset();
-        asset.setId(entity.getId());
-        asset.setMaterialNodeId(entity.getMaterialNode() != null ? entity.getMaterialNode().getId() : null);
-        asset.setKind(MaterialAsset.Kind.valueOf(entity.getKind().name()));
-        asset.setStorageKey(entity.getStorageKey());
-        asset.setOriginalFilename(entity.getOriginalFilename());
-        asset.setMimeType(entity.getMimeType());
-        asset.setFileSizeBytes(entity.getFileSizeBytes());
-        asset.setTitle(entity.getTitle());
-        asset.setTranscriptText(entity.getTranscriptText());
-        asset.setDisplayOrder(entity.getDisplayOrder());
-        asset.setMetadata(entity.getMetadata());
-        asset.setVersion(entity.getVersion());
-        asset.setCreatedAt(entity.getCreatedAt());
-        asset.setUpdatedAt(entity.getUpdatedAt());
-        return asset;
+        return MaterialAsset.builder()
+                .id(entity.getId())
+                .materialNodeId(entity.getMaterialNode() != null ? entity.getMaterialNode().getId() : null)
+                .kind(MaterialAsset.Kind.valueOf(entity.getKind().name()))
+                .storageKey(entity.getStorageKey())
+                .originalFilename(entity.getOriginalFilename())
+                .mimeType(entity.getMimeType())
+                .fileSizeBytes(entity.getFileSizeBytes())
+                .title(entity.getTitle())
+                .transcriptText(entity.getTranscriptText())
+                .displayOrder(entity.getDisplayOrder())
+                .metadata(entity.getMetadata())
+                .version(entity.getVersion())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
     }
 
     public static MaterialAssetEntity toEntity(MaterialAsset domain, MaterialNodeJpaEntity nodeEntity) {

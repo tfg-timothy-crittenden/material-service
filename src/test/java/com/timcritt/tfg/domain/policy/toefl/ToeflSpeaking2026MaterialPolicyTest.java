@@ -220,22 +220,22 @@ class ToeflSpeaking2026MaterialPolicyTest {
     }
 
     private static MaterialAsset imageAsset(Long nodeId) {
-        MaterialAsset asset = new MaterialAsset();
-        asset.setId(nodeId + 1000);
-        asset.setMaterialNodeId(nodeId);
-        asset.setKind(MaterialAsset.Kind.IMAGE);
-        asset.setStorageKey("speaking/10001/part1/image/image.png");
-        asset.setDisplayOrder(0);
-        return asset;
+        return MaterialAsset.builder()
+                .id(nodeId + 1000)
+                .materialNodeId(nodeId)
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey("speaking/10001/part1/image/image.png")
+                .displayOrder(0)
+                .build();
     }
 
     private static MaterialAsset audioAsset(Long nodeId) {
-        MaterialAsset asset = new MaterialAsset();
-        asset.setId(nodeId + 2000);
-        asset.setMaterialNodeId(nodeId);
-        asset.setKind(MaterialAsset.Kind.AUDIO);
-        asset.setStorageKey("speaking/10001/part/audio/question.mp3");
-        asset.setDisplayOrder(0);
-        return asset;
+        return MaterialAsset.builder()
+                .id(nodeId + 2000)
+                .materialNodeId(nodeId)
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("speaking/10001/part/audio/question.mp3")
+                .displayOrder(0)
+                .build();
     }
 }

@@ -57,6 +57,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         // AtomicLong gives the lambda a mutable id counter (local variables captured by lambdas must be effectively final).
         when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> {
             MaterialNode node = invocation.getArgument(0);
+
             if (node.getId() == null) {
                 node = MaterialNode.builder()
                         .id(nodeIds.getAndIncrement())
@@ -76,23 +77,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                         .updatedAt(node.getUpdatedAt())
                         .build();
             }
-            savedNodes.add(MaterialNode.builder()
-                    .id(node.getId())
-                    .materialId(node.getMaterialId())
-                    .parentNodeId(node.getParentNodeId())
-                    .kind(node.getKind())
-                    .title(node.getTitle())
-                    .displayOrder(node.getDisplayOrder())
-                    .skillId(node.getSkillId())
-                    .transcriptText(node.getTranscriptText())
-                    .responseMode(node.getResponseMode())
-                    .responseRequired(node.getResponseRequired())
-                    .scoringMode(node.getScoringMode())
-                    .config(node.getConfig())
-                    .version(node.getVersion())
-                    .createdAt(node.getCreatedAt())
-                    .updatedAt(node.getUpdatedAt())
-                    .build());
+
+            savedNodes.add(node);
             return node;
         });
 
@@ -247,10 +233,14 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         ));
         when(materialNodeRepository.findByParentNodeId(childNodeId)).thenReturn(List.of());
 
-        MaterialAsset rootAsset = new MaterialAsset();
-        rootAsset.setStorageKey("speaking/root-audio.mp3");
-        MaterialAsset childAsset = new MaterialAsset();
-        childAsset.setStorageKey("speaking/child-audio.mp3");
+        MaterialAsset rootAsset = MaterialAsset.builder()
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("speaking/root-audio.mp3")
+                .build();
+        MaterialAsset childAsset = MaterialAsset.builder()
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("speaking/child-audio.mp3")
+                .build();
 
         when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of(rootAsset));
         when(materialAssetRepository.findByMaterialNodeId(childNodeId)).thenReturn(List.of(childAsset));
@@ -301,15 +291,23 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1));
         when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
 
-        MaterialAsset imageAsset = new MaterialAsset();
-        imageAsset.setMaterialNodeId(part1NodeId);
-        imageAsset.setKind(MaterialAsset.Kind.IMAGE);
-        imageAsset.setStorageKey("speaking/88/part1/image/old-image.png");
-        imageAsset.setVersion(3L);
+        MaterialAsset imageAsset = MaterialAsset.builder()
+                .materialNodeId(part1NodeId)
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey("speaking/88/part1/image/old-image.png")
+                .version(3L)
+                .build();
+
+        List<MaterialAsset> part1Assets = new ArrayList<>(List.of(imageAsset));
 
         when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of(imageAsset));
-        when(materialAssetRepository.save(any(MaterialAsset.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenAnswer(invocation -> part1Assets);
+        when(materialAssetRepository.save(any(MaterialAsset.class))).thenAnswer(invocation -> {
+            MaterialAsset saved = invocation.getArgument(0);
+            part1Assets.clear();
+            part1Assets.add(saved);
+            return saved;
+        });
 
         UploadedFileCommand newImage = UploadedFileCommand.builder()
                 .originalFilename("new-image.png")
@@ -348,11 +346,12 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1));
         when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
 
-        MaterialAsset imageAsset = new MaterialAsset();
-        imageAsset.setId(5000L);
-        imageAsset.setMaterialNodeId(part1NodeId);
-        imageAsset.setKind(MaterialAsset.Kind.IMAGE);
-        imageAsset.setStorageKey("speaking/89/part1/image/old-image.png");
+        MaterialAsset imageAsset = MaterialAsset.builder()
+                .id(5000L)
+                .materialNodeId(part1NodeId)
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey("speaking/89/part1/image/old-image.png")
+                .build();
 
         List<MaterialAsset> part1Assets = new ArrayList<>(List.of(imageAsset));
         when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
@@ -421,11 +420,12 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(q0));
         when(materialNodeRepository.findByParentNodeId(questionNodeId)).thenReturn(List.of());
 
-        MaterialAsset audioAsset = new MaterialAsset();
-        audioAsset.setId(6000L);
-        audioAsset.setMaterialNodeId(questionNodeId);
-        audioAsset.setKind(MaterialAsset.Kind.AUDIO);
-        audioAsset.setStorageKey("speaking/90/part1/audio/old-question.mp3");
+        MaterialAsset audioAsset = MaterialAsset.builder()
+                .id(6000L)
+                .materialNodeId(questionNodeId)
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("speaking/90/part1/audio/old-question.mp3")
+                .build();
 
         List<MaterialAsset> qAssets = new ArrayList<>(List.of(audioAsset));
         when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
@@ -955,29 +955,33 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     }
 
     private static MaterialAsset imageAsset() {
-        MaterialAsset asset = new MaterialAsset();
-        asset.setKind(MaterialAsset.Kind.IMAGE);
-        asset.setStorageKey("speaking/1001/part1/image/image.png");
-        return asset;
+        return MaterialAsset.builder()
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey("speaking/1001/part1/image/image.png")
+                .build();
     }
 
     private static MaterialAsset imageAsset(Long nodeId) {
-        MaterialAsset asset = imageAsset();
-        asset.setMaterialNodeId(nodeId);
-        return asset;
+        return MaterialAsset.builder()
+                .materialNodeId(nodeId)
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey("speaking/1001/part1/image/image.png")
+                .build();
     }
 
     private static MaterialAsset audioAsset() {
-        MaterialAsset asset = new MaterialAsset();
-        asset.setKind(MaterialAsset.Kind.AUDIO);
-        asset.setStorageKey("speaking/1001/part1/audio/question_1.mp3");
-        return asset;
+        return MaterialAsset.builder()
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("speaking/1001/part1/audio/question_1.mp3")
+                .build();
     }
 
     private static MaterialAsset audioAsset(Long nodeId) {
-        MaterialAsset asset = audioAsset();
-        asset.setMaterialNodeId(nodeId);
-        return asset;
+        return MaterialAsset.builder()
+                .materialNodeId(nodeId)
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("speaking/1001/part1/audio/question_1.mp3")
+                .build();
     }
 }
 
