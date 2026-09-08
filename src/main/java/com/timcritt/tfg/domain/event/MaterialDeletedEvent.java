@@ -18,9 +18,9 @@ public class MaterialDeletedEvent {
     public Long getMaterialId() { return materialId; }
     public void setMaterialId(Long materialId) { this.materialId = materialId; }
     public Long getRootNodeId() { return rootNodeId; }
-    public void setRootNodeId(Long rootNodeId) { this.rootNodeId = rootNodeId; }
+
     public Instant getDeletedAt() { return deletedAt; }
-    public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
+
 
     public static class Builder {
         private Long materialId;

@@ -20,11 +20,11 @@ public class MaterialDetailsRequestedPayload {
     public static Builder builder() { return new Builder(); }
 
     public String getRequestId() { return requestId; }
-    public void setRequestId(String requestId) { this.requestId = requestId; }
+
     public List<Long> getMaterialIds() { return materialIds; }
-    public void setMaterialIds(List<Long> materialIds) { this.materialIds = materialIds; }
+
     public Instant getRequestedAt() { return requestedAt; }
-    public void setRequestedAt(Instant requestedAt) { this.requestedAt = requestedAt; }
+
 
     public static class Builder {
         private String requestId;
