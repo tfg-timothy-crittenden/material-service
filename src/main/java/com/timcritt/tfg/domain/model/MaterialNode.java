@@ -41,6 +41,15 @@ public class MaterialNode {
         return Collections.unmodifiableList(children);
     }
 
+    public MaterialNode childAt(int displayOrder) {
+        for (MaterialNode child : children) {
+            if (Objects.equals(child.displayOrder, displayOrder)) {
+                return child;
+            }
+        }
+        throw new IllegalArgumentException("No child with displayOrder " + displayOrder + " for node " + id);
+    }
+
     public List<MaterialAsset> getAssets() {
         return Collections.unmodifiableList(assets);
     }

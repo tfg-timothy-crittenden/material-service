@@ -1,9 +1,10 @@
 package com.timcritt.tfg.infrastructure.persistence.jpa;
 
 import com.timcritt.tfg.domain.model.MaterialNodeKind;
-import com.timcritt.tfg.infrastructure.persistence.auxiliary.MapToJsonConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.Map;
 
@@ -86,7 +87,7 @@ public class MaterialNodeJpaEntity {
     @Column(name = "passing_score")
     private Double passingScore;
 
-    @Convert(converter = MapToJsonConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config", columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> config;
 

@@ -6,11 +6,15 @@ import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialAssetEntity;
 import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialJpaEntity;
 import com.timcritt.tfg.infrastructure.persistence.jpa.MaterialNodeJpaEntity;
 import com.timcritt.tfg.infrastructure.persistence.mapper.MaterialEntityMapper;
+import com.timcritt.tfg.infrastructure.persistence.mapper.MaterialNodeEntityMapper;
 import com.timcritt.tfg.infrastructure.persistence.spring.MaterialAssetJpaRepository;
 import com.timcritt.tfg.infrastructure.persistence.spring.MaterialJpaRepository;
 import com.timcritt.tfg.infrastructure.persistence.spring.MaterialNodeJpaRepository;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Repository;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Optional;
 
 @Repository
@@ -34,15 +38,32 @@ public class MaterialRepositoryAdapter implements MaterialRepositoryPort {
     }
 
     @Override
+    @Transactional
     public Material save(Material material) {
         MaterialJpaEntity entity = MaterialEntityMapper.toEntity(material);
         MaterialJpaEntity saved = repository.save(entity);
 
-        return MaterialEntityMapper.toDomain(saved);
+        if (material != null && material.getRoot() != null) {
+            List<MaterialNodeJpaEntity> nodeEntities = flattenNodeTree(material.getRoot()).stream()
+                    .map(MaterialNodeEntityMapper::toEntity)
+                    .toList();
+
+            if (!nodeEntities.isEmpty()) {
+                nodeRepository.saveAll(nodeEntities);
+            }
+        }
+
+        return assembleAggregate(saved.getId()).orElseThrow(() -> new IllegalStateException(
+                "Saved material " + saved.getId() + " could not be reassembled"
+        ));
     }
 
     @Override
     public Optional<Material> findById(Long id) {
+        return assembleAggregate(id);
+    }
+
+    private Optional<Material> assembleAggregate(Long id) {
         return repository.findById(id)
                 .map(materialEntity -> {
 
@@ -96,5 +117,22 @@ public class MaterialRepositoryAdapter implements MaterialRepositoryPort {
     public Optional<Material> findByMaterialNodeId(Long materialNodeId) {
         return repository.findByMaterialNodeId(materialNodeId)
                 .map(MaterialEntityMapper::toDomain);
+    }
+
+    private List<com.timcritt.tfg.domain.model.MaterialNode> flattenNodeTree(com.timcritt.tfg.domain.model.MaterialNode root) {
+        if (root == null) {
+            return Collections.emptyList();
+        }
+
+        List<com.timcritt.tfg.domain.model.MaterialNode> nodes = new ArrayList<>();
+        collectNodes(root, nodes);
+        return nodes;
+    }
+
+    private void collectNodes(com.timcritt.tfg.domain.model.MaterialNode current, List<com.timcritt.tfg.domain.model.MaterialNode> nodes) {
+        nodes.add(current);
+        for (com.timcritt.tfg.domain.model.MaterialNode child : current.getChildren()) {
+            collectNodes(child, nodes);
+        }
     }
 }

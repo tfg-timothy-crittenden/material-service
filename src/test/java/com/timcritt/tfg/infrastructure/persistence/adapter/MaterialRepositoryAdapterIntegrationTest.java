@@ -2,6 +2,7 @@ package com.timcritt.tfg.infrastructure.persistence.adapter;
 
 import com.timcritt.tfg.domain.model.Material;
 import com.timcritt.tfg.domain.model.MaterialNode;
+import com.timcritt.tfg.domain.model.MaterialStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -65,6 +68,49 @@ class MaterialRepositoryAdapterIntegrationTest {
         assertThat(part1.getChildren()).hasSize(7);
         assertThat(part2.getChildren()).hasSize(4);
         assertThat(part1.getAssets()).hasSize(1);
-        assertThat(part1.getChildren().get(0).getAssets()).hasSize(1);
+        assertThat(part1.getChildren().getFirst().getAssets()).hasSize(1);
+    }
+
+    @Test
+    void save_persistsChangesMadeToChildNodesWithinTheMaterialAggregate() {
+        Material material = materialRepositoryAdapter.findById(10001L).orElseThrow();
+
+        assertThat(material.hasRoot()).isTrue();
+        assertThat(material.getRoot()).isNotNull();
+        assertThat(material.getRoot().getChildren()).hasSize(2);
+
+        MaterialNode part1 = material.getRoot().getChildren().getFirst();
+        String updatedTitle = part1.getTitle() + " (updated)";
+
+        part1.updateTitle(updatedTitle);
+
+        Material saved = materialRepositoryAdapter.save(material);
+
+        assertThat(saved.hasRoot()).isTrue();
+        assertThat(saved.getRoot()).isNotNull();
+        assertThat(saved.getRoot().getChildren()).hasSize(2);
+        assertThat(saved.getRoot().getChildren().getFirst().getTitle()).isEqualTo(updatedTitle);
+
+        Material reloaded = materialRepositoryAdapter.findById(10001L).orElseThrow();
+
+        assertThat(reloaded.getRoot().getChildren().getFirst().getTitle()).isEqualTo(updatedTitle);
+    }
+
+    @Test
+    void save_assignsDatabaseGeneratedIdToNewMaterial() {
+        Material material = Material.builder()
+                .id(null)
+                .examFamilyId(1L)
+                .title("New draft material")
+                .description("Created in test")
+                .status(MaterialStatus.DRAFT)
+                .version(0L)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        Material saved = materialRepositoryAdapter.save(material);
+
+        assertThat(saved.getId()).isNotNull();
     }
 }

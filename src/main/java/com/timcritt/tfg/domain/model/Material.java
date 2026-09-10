@@ -3,7 +3,12 @@ package com.timcritt.tfg.domain.model;
 import com.timcritt.tfg.domain.policy.MaterialPolicy;
 
 import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public class Material {
 
@@ -124,25 +129,95 @@ public class Material {
             String title,
             String description
     ) {
-        if (title != null) {
-            if (title.isBlank()) {
-                throw new IllegalArgumentException(
-                        "title cannot be blank"
-                );
+        String normalizedTitle = title == null ? null : title.trim();
+        if (normalizedTitle != null && normalizedTitle.isBlank()) {
+            throw new IllegalArgumentException("title cannot be blank");
+        }
+        String normalizedDescription = description == null ? null : description.trim();
+
+        boolean changed = false;
+        if (normalizedTitle != null) {
+            if (!Objects.equals(this.title, normalizedTitle)) {
+                this.title = normalizedTitle;
+                changed = true;
             }
-
-            this.title = title.trim();
+            if (root != null) {
+                Long previousRootVersion = root.getVersion();
+                root.updateTitle(normalizedTitle);
+                changed |= !Objects.equals(previousRootVersion, root.getVersion());
+            }
         }
 
-        if (description != null) {
-            this.description = description.trim();
+        if (normalizedDescription != null && !Objects.equals(this.description, normalizedDescription)) {
+            this.description = normalizedDescription;
+            changed = true;
         }
 
-        incrementVersion();
-        touch();
+        if (changed) {
+            incrementVersion();
+            touch();
+        }
+    }
+
+    public void updateNodeTitle(Long nodeId, String title) {
+        MaterialNode node = requireAttachedNode(nodeId);
+        Long previousVersion = node.getVersion();
+        node.updateTitle(title);
+
+        if (!Objects.equals(previousVersion, node.getVersion())) {
+            incrementVersion();
+            touch();
+        }
+    }
+
+    public void updateNodeTranscript(Long nodeId, String transcriptText) {
+        MaterialNode node = requireAttachedNode(nodeId);
+        Long previousVersion = node.getVersion();
+        node.updateTranscriptText(transcriptText);
+
+        if (!Objects.equals(previousVersion, node.getVersion())) {
+            incrementVersion();
+            touch();
+        }
+    }
+
+    public void updateNodeConfig(Long nodeId, Map<String, Object> config) {
+        MaterialNode node = requireAttachedNode(nodeId);
+        Long previousVersion = node.getVersion();
+        node.updateConfig(config);
+
+        if (!Objects.equals(previousVersion, node.getVersion())) {
+            incrementVersion();
+            touch();
+        }
     }
 
     // ***************************** INTERNAL DOMAIN HELPERS *****************************
+
+    private MaterialNode requireAttachedNode(Long nodeId) {
+        if (nodeId == null) {
+            throw new IllegalArgumentException("nodeId cannot be null");
+        }
+
+        ArrayDeque<MaterialNode> toVisit = new ArrayDeque<>();
+        Set<MaterialNode> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        if (root != null) {
+            toVisit.add(root);
+        }
+
+        while (!toVisit.isEmpty()) {
+            MaterialNode node = toVisit.removeFirst();
+            if (!visited.add(node)) {
+                continue;
+            }
+            if (Objects.equals(nodeId, node.getId())) {
+                return node;
+            }
+            toVisit.addAll(node.getChildren());
+        }
+
+        throw new IllegalArgumentException("No attached node with ID " + nodeId + " for material " + id);
+    }
 
     private void incrementVersion() {
         this.version = version == null ? 1L : version + 1;
