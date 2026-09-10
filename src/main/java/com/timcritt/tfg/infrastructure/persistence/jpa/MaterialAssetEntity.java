@@ -1,6 +1,5 @@
 package com.timcritt.tfg.infrastructure.persistence.jpa;
 
-import com.timcritt.tfg.infrastructure.persistence.auxiliary.JsonbConverter;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -8,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "material_asset")
@@ -53,7 +54,7 @@ public class MaterialAssetEntity {
     private Integer displayOrder = 0;
 
     @Column(columnDefinition = "jsonb", nullable = false)
-    @Convert(converter = JsonbConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> metadata;
 
     @Column(nullable = false)

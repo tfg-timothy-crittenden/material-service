@@ -8,6 +8,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -24,6 +26,7 @@ import static org.mockito.Mockito.verify;
 class MaterialTest {
 
     private static final Instant ORIGINAL_TIME = Instant.parse("2020-01-01T00:00:00Z");
+    private static final OffsetDateTime ORIGINAL_ASSET_TIME = ORIGINAL_TIME.atOffset(ZoneOffset.UTC);
 
     @Test
     void publish_draftMaterial_validatesAndTransitionsToPublished() {
@@ -476,6 +479,543 @@ class MaterialTest {
                     );
                 }
         );
+    }
+
+    @Test
+    void replaceNodeAssetFile_nestedAsset_selectsByIdentityAndVersionsReplacementOnce() {
+        Tree tree = attachedTree();
+        MaterialAsset otherAudio = asset(701L, tree.question().getId());
+        MaterialAsset target = asset(700L, tree.question().getId());
+        tree.question().addAsset(otherAudio);
+        tree.question().addAsset(target);
+
+        AssetChange change = tree.material().replaceNodeAssetFile(
+                1003L, 700L, "  new-key  ", "  new.mp3  ", "  audio/mpeg  ", 1234L);
+
+        assertThat(change.previousStorageKey()).isEqualTo("key-X");
+        assertThat(change.currentStorageKey()).isEqualTo("new-key");
+        assertThat(target.getStorageKey()).isEqualTo("new-key");
+        assertThat(target.getOriginalFilename()).isEqualTo("new.mp3");
+        assertThat(target.getMimeType()).isEqualTo("audio/mpeg");
+        assertThat(target.getFileSizeBytes()).isEqualTo(1234L);
+        assertThat(tree.question().getAssets()).containsExactly(otherAudio, target);
+        assertThat(tree.question().getAssets().get(1)).isSameAs(target);
+        assertAssetIdentityAndNonFileState(target, 700L, tree.question().getId());
+        assertAssetUnchanged(otherAudio, 701L, tree.question().getId());
+        assertAssetReplacementOnce(tree, target);
+    }
+
+    @Test
+    void replaceNodeAssetFile_identicalKeyAndMetadata_stillVersionsAndRetainsBothKeys() {
+        Tree tree = attachedTree();
+        MaterialAsset target = asset(700L, tree.question().getId());
+        tree.question().addAsset(target);
+
+        AssetChange change = tree.material().replaceNodeAssetFile(
+                tree.question().getId(), 700L, "key-X", "old.mp3", "audio/mpeg", 123L);
+
+        assertThat(change.previousStorageKey()).isEqualTo("key-X");
+        assertThat(change.currentStorageKey()).isEqualTo("key-X");
+        assertThat(target.getStorageKey()).isEqualTo("key-X");
+        assertThat(target.getOriginalFilename()).isEqualTo("old.mp3");
+        assertThat(target.getMimeType()).isEqualTo("audio/mpeg");
+        assertThat(target.getFileSizeBytes()).isEqualTo(123L);
+        assertAssetIdentityAndNonFileState(target, 700L, tree.question().getId());
+        assertAssetReplacementOnce(tree, target);
+    }
+
+    @Test
+    void replaceNodeAssetFile_assetOnAnotherAttachedNode_rejectsWrongNodeBoundary() {
+        Tree tree = attachedTree();
+        MaterialAsset target = asset(700L, tree.sibling().getId());
+        MaterialAsset localAudio = asset(701L, tree.question().getId());
+        tree.sibling().addAsset(target);
+        tree.question().addAsset(localAudio);
+
+        assertThatThrownBy(() -> tree.material().replaceNodeAssetFile(
+                tree.question().getId(), 700L, "new-key", "new.mp3", "audio/mpeg", 1234L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("700")
+                .hasMessageContaining(tree.question().getId().toString());
+
+        assertTreeUnchanged(tree);
+        assertAssetUnchanged(target, 700L, tree.sibling().getId());
+        assertAssetUnchanged(localAudio, 701L, tree.question().getId());
+    }
+
+    @Test
+    void replaceNodeAssetFile_missingNode_throwsWithoutMutation() {
+        Tree tree = attachedTree();
+        MaterialAsset target = asset(700L, tree.question().getId());
+        tree.question().addAsset(target);
+
+        assertThatThrownBy(() -> tree.material().replaceNodeAssetFile(
+                9999L, 700L, "new-key", "new.mp3", "audio/mpeg", 1234L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("9999");
+
+        assertTreeUnchanged(tree);
+        assertAssetUnchanged(target, 700L, tree.question().getId());
+    }
+
+    @Test
+    void replaceNodeAssetFile_missingAssetUnderNode_throwsWithoutMutation() {
+        Tree tree = attachedTree();
+        MaterialAsset existing = asset(700L, tree.question().getId());
+        tree.question().addAsset(existing);
+
+        assertThatThrownBy(() -> tree.material().replaceNodeAssetFile(
+                tree.question().getId(), 9999L, "new-key", "new.mp3", "audio/mpeg", 1234L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("9999")
+                .hasMessageContaining(tree.question().getId().toString());
+
+        assertTreeUnchanged(tree);
+        assertAssetUnchanged(existing, 700L, tree.question().getId());
+    }
+
+    @Test
+    void replaceNodeAssetFile_detachedAssetWithMatchingOwner_isNotAccepted() {
+        Tree tree = attachedTree();
+        MaterialAsset detached = asset(700L, tree.question().getId());
+        MaterialAsset attached = asset(701L, tree.question().getId());
+        tree.question().addAsset(attached);
+        assertThat(detached.getMaterialNodeId()).isEqualTo(tree.question().getId());
+        assertThat(tree.question().getAssets()).doesNotContain(detached);
+
+        assertThatThrownBy(() -> tree.material().replaceNodeAssetFile(
+                tree.question().getId(), detached.getId(), "new-key", "new.mp3", "audio/mpeg", 1234L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("700")
+                .hasMessageContaining(tree.question().getId().toString());
+
+        assertTreeUnchanged(tree);
+        assertThat(tree.question().getAssets()).containsExactly(attached);
+        assertAssetUnchanged(detached, 700L, tree.question().getId());
+        assertAssetUnchanged(attached, 701L, tree.question().getId());
+    }
+
+    @Test
+    void replaceNodeAssetFile_assetOnDetachedSameMaterialNode_isNotAccepted() {
+        Tree tree = attachedTree();
+        MaterialNode detachedNode = node(2001L, tree.child().getId(), MaterialNodeKind.ITEM,
+                Map.of("durationSeconds", 30));
+        MaterialAsset detached = asset(700L, detachedNode.getId());
+        detachedNode.addAsset(detached);
+        assertThat(detachedNode.getMaterialId()).isEqualTo(tree.material().getId());
+
+        assertThatThrownBy(() -> tree.material().replaceNodeAssetFile(
+                detachedNode.getId(), 700L, "new-key", "new.mp3", "audio/mpeg", 1234L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("2001");
+
+        assertTreeUnchanged(tree);
+        assertNodeUnchanged(detachedNode);
+        assertAssetUnchanged(detached, 700L, detachedNode.getId());
+    }
+
+    @Test
+    void replaceNodeAssetFile_resultIsImmutableValueSnapshot_notLiveAssetState() {
+        Tree tree = attachedTree();
+        MaterialAsset target = asset(700L, tree.question().getId());
+        tree.question().addAsset(target);
+
+        AssetChange first = tree.material().replaceNodeAssetFile(
+                tree.question().getId(), 700L, "first-key", "first.mp3", "audio/mpeg", 100L);
+        AssetChange second = tree.material().replaceNodeAssetFile(
+                tree.question().getId(), 700L, "second-key", "second.mp3", "audio/mpeg", 200L);
+
+        // Two String components in a record provide immutable value semantics.
+        assertThat(AssetChange.class.isRecord()).isTrue();
+        assertThat(first).isEqualTo(new AssetChange("key-X", "first-key"));
+        assertThat(first.previousStorageKey()).isEqualTo("key-X");
+        assertThat(first.currentStorageKey()).isEqualTo("first-key");
+        assertThat(second.previousStorageKey()).isEqualTo("first-key");
+        assertThat(second.currentStorageKey()).isEqualTo("second-key");
+        assertThat(target.getStorageKey()).isEqualTo("second-key");
+        assertThat(target.getVersion()).isEqualTo(7L);
+        assertThat(tree.material().getVersion()).isEqualTo(9L);
+        assertNodeUnchanged(tree.question());
+    }
+
+    @Test
+    void removeNodeAsset_nestedAsset_removesSelectedIdentityAndVersionsAggregateOnce() {
+        Tree tree = attachedTree();
+        MaterialAsset survivor = asset(701L, tree.question().getId(), "other-key");
+        MaterialAsset target = asset(700L, tree.question().getId(), "old-key");
+        tree.question().addAsset(survivor);
+        tree.question().addAsset(target);
+        var assetsView = tree.question().getAssets();
+
+        AssetChange change = tree.material().removeNodeAsset(tree.question().getId(), 700L);
+
+        assertAll(
+                () -> assertThat(change).isEqualTo(new AssetChange("old-key", null)),
+                () -> assertThat(change.previousStorageKey()).isEqualTo("old-key"),
+                () -> assertThat(change.currentStorageKey()).isNull(),
+                () -> assertThat(tree.question().getAssets()).containsExactly(survivor),
+                () -> assertThat(assetsView).containsExactly(survivor),
+                () -> assertThat(tree.question().getAssets()).doesNotContain(target),
+                () -> assertThat(tree.question().getAssets().getFirst()).isSameAs(survivor),
+                () -> assertThatThrownBy(() -> assetsView.add(asset(702L, tree.question().getId())))
+                        .isInstanceOf(UnsupportedOperationException.class),
+                () -> assertAssetUnchanged(survivor, 701L, tree.question().getId(), "other-key"),
+                () -> assertAssetUnchanged(target, 700L, tree.question().getId(), "old-key"),
+                () -> assertThat(tree.material().getVersion()).isEqualTo(8L),
+                () -> assertThat(tree.material().getUpdatedAt()).isAfter(ORIGINAL_TIME),
+                () -> assertThat(tree.material().getCreatedAt()).isEqualTo(ORIGINAL_TIME),
+                () -> assertNodeUnchanged(tree.root()),
+                () -> assertNodeUnchanged(tree.child()),
+                () -> assertNodeUnchanged(tree.question()),
+                () -> assertNodeUnchanged(tree.sibling())
+        );
+    }
+
+    @Test
+    void removeNodeAsset_assetOnAnotherAttachedNode_rejectsWrongNodeBoundary() {
+        Tree tree = attachedTree();
+        MaterialAsset target = asset(700L, tree.sibling().getId(), "old-key");
+        MaterialAsset localAudio = asset(701L, tree.question().getId(), "local-key");
+        tree.sibling().addAsset(target);
+        tree.question().addAsset(localAudio);
+
+        assertThatThrownBy(() -> tree.material().removeNodeAsset(tree.question().getId(), 700L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("700")
+                .hasMessageContaining(tree.question().getId().toString());
+
+        assertTreeUnchanged(tree);
+        assertAssetUnchanged(target, 700L, tree.sibling().getId(), "old-key");
+        assertAssetUnchanged(localAudio, 701L, tree.question().getId(), "local-key");
+    }
+
+    @Test
+    void removeNodeAsset_missingNode_throwsWithoutMutation() {
+        Tree tree = attachedTree();
+        MaterialAsset target = asset(700L, tree.question().getId(), "old-key");
+        tree.question().addAsset(target);
+
+        assertThatThrownBy(() -> tree.material().removeNodeAsset(9999L, 700L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("9999");
+
+        assertTreeUnchanged(tree);
+        assertAssetUnchanged(target, 700L, tree.question().getId(), "old-key");
+    }
+
+    @Test
+    void removeNodeAsset_missingAssetUnderNode_throwsWithoutMutation() {
+        Tree tree = attachedTree();
+        MaterialAsset existing = asset(700L, tree.question().getId(), "old-key");
+        tree.question().addAsset(existing);
+
+        assertThatThrownBy(() -> tree.material().removeNodeAsset(tree.question().getId(), 9999L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("9999")
+                .hasMessageContaining(tree.question().getId().toString());
+
+        assertTreeUnchanged(tree);
+        assertAssetUnchanged(existing, 700L, tree.question().getId(), "old-key");
+    }
+
+    @Test
+    void removeNodeAsset_detachedAssetWithMatchingOwner_isNotAccepted() {
+        Tree tree = attachedTree();
+        MaterialAsset detached = asset(700L, tree.question().getId(), "old-key");
+        MaterialAsset attached = asset(701L, tree.question().getId(), "local-key");
+        tree.question().addAsset(attached);
+        assertThat(detached.getMaterialNodeId()).isEqualTo(tree.question().getId());
+        assertThat(tree.question().getAssets()).doesNotContain(detached);
+
+        assertThatThrownBy(() -> tree.material().removeNodeAsset(tree.question().getId(), detached.getId()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("700")
+                .hasMessageContaining(tree.question().getId().toString());
+
+        assertTreeUnchanged(tree);
+        assertThat(tree.question().getAssets()).containsExactly(attached);
+        assertAssetUnchanged(detached, 700L, tree.question().getId(), "old-key");
+        assertAssetUnchanged(attached, 701L, tree.question().getId(), "local-key");
+    }
+
+    @Test
+    void removeNodeAsset_resultIsImmutableValueSnapshot_afterSubsequentAggregateChanges() {
+        Tree tree = attachedTree();
+        MaterialAsset firstTarget = asset(700L, tree.question().getId(), "first-key");
+        MaterialAsset secondTarget = asset(701L, tree.question().getId(), "second-key");
+        tree.question().addAsset(firstTarget);
+        tree.question().addAsset(secondTarget);
+
+        AssetChange first = tree.material().removeNodeAsset(tree.question().getId(), 700L);
+        tree.material().updateNodeTranscript(tree.question().getId(), "Revised transcript");
+        AssetChange second = tree.material().removeNodeAsset(tree.question().getId(), 701L);
+
+        assertAll(
+                () -> assertThat(AssetChange.class.isRecord()).isTrue(),
+                () -> assertThat(first).isEqualTo(new AssetChange("first-key", null)),
+                () -> assertThat(first.previousStorageKey()).isEqualTo("first-key"),
+                () -> assertThat(first.currentStorageKey()).isNull(),
+                () -> assertThat(second).isEqualTo(new AssetChange("second-key", null)),
+                () -> assertThat(second.previousStorageKey()).isEqualTo("second-key"),
+                () -> assertThat(second.currentStorageKey()).isNull(),
+                () -> assertThat(tree.question().getAssets()).isEmpty(),
+                () -> assertThat(firstTarget.getVersion()).isEqualTo(5L),
+                () -> assertThat(firstTarget.getUpdatedAt()).isEqualTo(ORIGINAL_ASSET_TIME),
+                () -> assertThat(secondTarget.getVersion()).isEqualTo(5L),
+                () -> assertThat(secondTarget.getUpdatedAt()).isEqualTo(ORIGINAL_ASSET_TIME),
+                () -> assertThat(tree.question().getTranscriptText()).isEqualTo("Revised transcript"),
+                () -> assertThat(tree.question().getVersion()).isEqualTo(4L),
+                () -> assertThat(tree.material().getVersion()).isEqualTo(10L)
+        );
+    }
+
+    @Test
+    void addNodeAsset_nestedNode_createsAndAttachesNewAssetThroughAggregateOnce() {
+        Tree tree = attachedTree();
+
+        AssetChange change = tree.material().addNodeAsset(
+                tree.question().getId(),
+                MaterialAsset.Kind.AUDIO,
+                "  new-key  ",
+                "  new.mp3  ",
+                "  audio/mpeg  ",
+                1234L
+        );
+
+        MaterialAsset created = tree.question().getAssets().getFirst();
+        assertAll(
+                () -> assertThat(change).isEqualTo(new AssetChange(null, "new-key")),
+                () -> assertThat(change.previousStorageKey()).isNull(),
+                () -> assertThat(change.currentStorageKey()).isEqualTo("new-key"),
+                () -> assertThat(tree.question().getAssets()).containsExactly(created),
+                () -> assertThat(created.getId()).isNull(),
+                () -> assertThat(created.getMaterialNodeId()).isEqualTo(tree.question().getId()),
+                () -> assertThat(created.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO),
+                () -> assertThat(created.getStorageKey()).isEqualTo("new-key"),
+                () -> assertThat(created.getOriginalFilename()).isEqualTo("new.mp3"),
+                () -> assertThat(created.getMimeType()).isEqualTo("audio/mpeg"),
+                () -> assertThat(created.getFileSizeBytes()).isEqualTo(1234L),
+                () -> assertThat(created.getTitle()).isNull(),
+                () -> assertThat(created.getTranscriptText()).isNull(),
+                () -> assertThat(created.getDisplayOrder()).isEqualTo(0),
+                () -> assertThat(created.getMetadata()).isEmpty(),
+                () -> assertThat(created.getVersion()).isEqualTo(0L),
+                () -> assertThat(created.getCreatedAt()).isNotNull(),
+                () -> assertThat(created.getUpdatedAt()).isEqualTo(created.getCreatedAt()),
+                () -> assertThat(tree.material().getVersion()).isEqualTo(8L),
+                () -> assertThat(tree.material().getUpdatedAt()).isAfter(ORIGINAL_TIME),
+                () -> assertNodeUnchanged(tree.root()),
+                () -> assertNodeUnchanged(tree.child()),
+                () -> assertNodeUnchanged(tree.question()),
+                () -> assertNodeUnchanged(tree.sibling())
+        );
+    }
+
+    @Test
+    void addNodeAsset_sameKindSecondAsset_isAllowedAndRemovalRemainsIdentityBased() {
+        Tree tree = attachedTree();
+        MaterialAsset existingAudio = asset(700L, tree.question().getId(), "existing-key");
+        tree.question().addAsset(existingAudio);
+
+        AssetChange added = tree.material().addNodeAsset(
+                tree.question().getId(),
+                MaterialAsset.Kind.AUDIO,
+                "second-key",
+                "second.mp3",
+                "audio/mpeg",
+                4321L
+        );
+
+        MaterialAsset created = tree.question().getAssets().get(1);
+        assertAll(
+                () -> assertThat(added).isEqualTo(new AssetChange(null, "second-key")),
+                () -> assertThat(tree.question().getAssets()).containsExactly(existingAudio, created),
+                () -> assertThat(existingAudio.getId()).isEqualTo(700L),
+                () -> assertThat(created.getId()).isNull(),
+                () -> assertThat(created.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO),
+                () -> assertThat(created.getStorageKey()).isEqualTo("second-key"),
+                () -> assertAssetUnchanged(existingAudio, 700L, tree.question().getId(), "existing-key"),
+                () -> assertThat(tree.material().getVersion()).isEqualTo(8L),
+                () -> assertNodeUnchanged(tree.question())
+        );
+    }
+
+    @Test
+    void addNodeAsset_missingNode_throwsWithoutMutation() {
+        Tree tree = attachedTree();
+
+        assertThatThrownBy(() -> tree.material().addNodeAsset(
+                9999L,
+                MaterialAsset.Kind.AUDIO,
+                "new-key",
+                "new.mp3",
+                "audio/mpeg",
+                1234L
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("9999");
+
+        assertThat(tree.question().getAssets()).isEmpty();
+        assertTreeUnchanged(tree);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidAssetCreations")
+    void addNodeAsset_invalidInput_preservesAggregateAndMembership(
+            MaterialAsset.Kind kind, String key, Long size, String message) {
+        Tree tree = attachedTree();
+
+        assertThatThrownBy(() -> tree.material().addNodeAsset(
+                tree.question().getId(),
+                kind,
+                key,
+                "new.mp3",
+                "audio/mpeg",
+                size
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(message);
+
+        assertThat(tree.question().getAssets()).isEmpty();
+        assertTreeUnchanged(tree);
+    }
+
+    @Test
+    void addNodeAsset_resultIsImmutableValueSnapshot_afterSubsequentAggregateChanges() {
+        Tree tree = attachedTree();
+
+        AssetChange first = tree.material().addNodeAsset(
+                tree.question().getId(),
+                MaterialAsset.Kind.AUDIO,
+                "first-key",
+                "first.mp3",
+                "audio/mpeg",
+                100L
+        );
+        tree.material().updateNodeTranscript(tree.question().getId(), "Revised transcript");
+        AssetChange second = tree.material().addNodeAsset(
+                tree.question().getId(),
+                MaterialAsset.Kind.IMAGE,
+                "second-key",
+                "second.png",
+                "image/png",
+                200L
+        );
+
+        assertAll(
+                () -> assertThat(AssetChange.class.isRecord()).isTrue(),
+                () -> assertThat(first).isEqualTo(new AssetChange(null, "first-key")),
+                () -> assertThat(first.previousStorageKey()).isNull(),
+                () -> assertThat(first.currentStorageKey()).isEqualTo("first-key"),
+                () -> assertThat(second).isEqualTo(new AssetChange(null, "second-key")),
+                () -> assertThat(second.previousStorageKey()).isNull(),
+                () -> assertThat(second.currentStorageKey()).isEqualTo("second-key"),
+                () -> assertThat(tree.question().getAssets()).hasSize(2),
+                () -> assertThat(tree.question().getAssets().getFirst().getStorageKey()).isEqualTo("first-key"),
+                () -> assertThat(tree.question().getAssets().get(1).getStorageKey()).isEqualTo("second-key"),
+                () -> assertThat(tree.question().getVersion()).isEqualTo(4L),
+                () -> assertThat(tree.material().getVersion()).isEqualTo(10L)
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidAssetFiles")
+    void replaceNodeAssetFile_invalidFile_preservesAssetAndAggregate(
+            String key, Long size, String message) {
+        Tree tree = attachedTree();
+        MaterialAsset target = asset(700L, tree.question().getId());
+        tree.question().addAsset(target);
+
+        assertThatThrownBy(() -> tree.material().replaceNodeAssetFile(
+                tree.question().getId(), 700L, key, "new.mp3", "audio/mpeg", size))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(message);
+
+        assertTreeUnchanged(tree);
+        assertAssetUnchanged(target, 700L, tree.question().getId());
+    }
+
+    private static Stream<Arguments> invalidAssetFiles() {
+        return Stream.of(
+                Arguments.of(null, 1234L, "storageKey cannot be blank"),
+                Arguments.of("  ", 1234L, "storageKey cannot be blank"),
+                Arguments.of("new-key", -1L, "fileSizeBytes cannot be negative")
+        );
+    }
+
+    private static Stream<Arguments> invalidAssetCreations() {
+        return Stream.of(
+                Arguments.of(null, "new-key", 1234L, "kind cannot be null"),
+                Arguments.of(MaterialAsset.Kind.AUDIO, null, 1234L, "storageKey cannot be blank"),
+                Arguments.of(MaterialAsset.Kind.AUDIO, "  ", 1234L, "storageKey cannot be blank"),
+                Arguments.of(MaterialAsset.Kind.AUDIO, "new-key", -1L, "fileSizeBytes cannot be negative")
+        );
+    }
+
+    private static MaterialAsset asset(Long id, Long nodeId) {
+        return MaterialAsset.builder()
+                .id(id).materialNodeId(nodeId).kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("key-X").originalFilename("old.mp3").mimeType("audio/mpeg").fileSizeBytes(123L)
+                .title("Asset title").transcriptText("Asset transcript").displayOrder(2)
+                .metadata(Map.of("language", "en")).version(5L)
+                .createdAt(ORIGINAL_ASSET_TIME).updatedAt(ORIGINAL_ASSET_TIME)
+                .build();
+    }
+
+    private static MaterialAsset asset(Long id, Long nodeId, String storageKey) {
+        return MaterialAsset.builder()
+                .id(id).materialNodeId(nodeId).kind(MaterialAsset.Kind.AUDIO)
+                .storageKey(storageKey).originalFilename("old.mp3").mimeType("audio/mpeg").fileSizeBytes(123L)
+                .title("Asset title").transcriptText("Asset transcript").displayOrder(2)
+                .metadata(Map.of("language", "en")).version(5L)
+                .createdAt(ORIGINAL_ASSET_TIME).updatedAt(ORIGINAL_ASSET_TIME)
+                .build();
+    }
+
+    private static void assertAssetIdentityAndNonFileState(MaterialAsset asset, Long id, Long nodeId) {
+        assertThat(asset.getId()).isEqualTo(id);
+        assertThat(asset.getMaterialNodeId()).isEqualTo(nodeId);
+        assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+        assertThat(asset.getTitle()).isEqualTo("Asset title");
+        assertThat(asset.getTranscriptText()).isEqualTo("Asset transcript");
+        assertThat(asset.getDisplayOrder()).isEqualTo(2);
+        assertThat(asset.getMetadata()).containsExactlyEntriesOf(Map.of("language", "en"));
+        assertThat(asset.getCreatedAt()).isEqualTo(ORIGINAL_ASSET_TIME);
+    }
+
+    private static void assertAssetUnchanged(MaterialAsset asset, Long id, Long nodeId) {
+        assertAssetIdentityAndNonFileState(asset, id, nodeId);
+        assertThat(asset.getStorageKey()).isEqualTo("key-X");
+        assertThat(asset.getOriginalFilename()).isEqualTo("old.mp3");
+        assertThat(asset.getMimeType()).isEqualTo("audio/mpeg");
+        assertThat(asset.getFileSizeBytes()).isEqualTo(123L);
+        assertThat(asset.getVersion()).isEqualTo(5L);
+        assertThat(asset.getUpdatedAt()).isEqualTo(ORIGINAL_ASSET_TIME);
+    }
+
+    private static void assertAssetUnchanged(MaterialAsset asset, Long id, Long nodeId, String storageKey) {
+        assertAssetIdentityAndNonFileState(asset, id, nodeId);
+        assertThat(asset.getStorageKey()).isEqualTo(storageKey);
+        assertThat(asset.getOriginalFilename()).isEqualTo("old.mp3");
+        assertThat(asset.getMimeType()).isEqualTo("audio/mpeg");
+        assertThat(asset.getFileSizeBytes()).isEqualTo(123L);
+        assertThat(asset.getVersion()).isEqualTo(5L);
+        assertThat(asset.getUpdatedAt()).isEqualTo(ORIGINAL_ASSET_TIME);
+    }
+
+    private static void assertAssetReplacementOnce(Tree tree, MaterialAsset asset) {
+        assertThat(asset.getVersion()).isEqualTo(6L);
+        assertThat(asset.getUpdatedAt()).isAfter(ORIGINAL_ASSET_TIME);
+        assertThat(tree.material().getVersion()).isEqualTo(8L);
+        assertThat(tree.material().getUpdatedAt()).isAfter(ORIGINAL_TIME);
+        assertThat(tree.material().getCreatedAt()).isEqualTo(ORIGINAL_TIME);
+        assertThat(tree.material().getTitle()).isEqualTo("Material title");
+        assertThat(tree.material().getDescription()).isEqualTo("Material description");
+        assertThat(tree.material().getStatus()).isEqualTo(MaterialStatus.DRAFT);
+        assertNodeUnchanged(tree.root());
+        assertNodeUnchanged(tree.child());
+        assertNodeUnchanged(tree.question());
+        assertNodeUnchanged(tree.sibling());
     }
 
     private static Stream<Arguments> nodeMutations() {

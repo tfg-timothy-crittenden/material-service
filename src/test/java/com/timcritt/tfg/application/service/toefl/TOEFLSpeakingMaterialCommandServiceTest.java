@@ -1,7 +1,9 @@
 package com.timcritt.tfg.application.service.toefl;
 
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionUploadCommand;
-import com.timcritt.tfg.application.port.outbound.*;
+import com.timcritt.tfg.application.port.outbound.IntegrationEventOutboxPort;
+import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
+import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionPartialUpdateCommand;
@@ -17,11 +19,11 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,10 +34,10 @@ import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MAT
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -46,90 +48,32 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     private static final Instant ORIGINAL_TIME = Instant.parse("2020-01-01T00:00:00Z");
 
     private final MaterialRepositoryPort materialRepository = mock(MaterialRepositoryPort.class);
-    private final MaterialNodeRepositoryPort materialNodeRepository = mock(MaterialNodeRepositoryPort.class);
-    private final MaterialAssetRepositoryPort materialAssetRepository = mock(MaterialAssetRepositoryPort.class);
     private final StorageRepositoryPort storageRepositoryPort = mock(StorageRepositoryPort.class);
     private final IntegrationEventOutboxPort outboxPort = mock(IntegrationEventOutboxPort.class);
 
     private final TOEFLSpeakingMaterialCommandService service = new TOEFLSpeakingMaterialCommandService(
             materialRepository,
-            materialNodeRepository,
-            materialAssetRepository,
             storageRepositoryPort,
             outboxPort
     );
 
     @Test
     void uploadSpeakingSection_scaffoldsMissingDraftQuestionNodesForBothParts() {
-        AtomicLong nodeIds = new AtomicLong(100L);
-        AtomicLong materialIds = new AtomicLong(1000L);
-        List<MaterialNode> savedNodes = new ArrayList<>();
-        List<Material> savedMaterials = new ArrayList<>();
+        Material persistedScaffold = persistedSpeakingScaffoldMaterial(1000L, "Draft section", null);
+        Material finalAggregate = persistedSpeakingScaffoldMaterial(1000L, "Draft section", null);
+        finalAggregate.addNodeAsset(9101L, MaterialAsset.Kind.IMAGE,
+                "speaking/1000/part1/image/image.png", "cover.png", "image/png", 3L);
+        finalAggregate.addNodeAsset(9110L, MaterialAsset.Kind.AUDIO,
+                "speaking/1000/part1/audio/question_1.mp3", "question-audio.mp3", "audio/mpeg", 3L);
+        finalAggregate.addNodeAsset(9120L, MaterialAsset.Kind.AUDIO,
+                "speaking/1000/part2/audio/question_1.mp3", "question-audio.mp3", "audio/mpeg", 3L);
+        finalAggregate.addNodeAsset(9121L, MaterialAsset.Kind.AUDIO,
+                "speaking/1000/part2/audio/question_2.mp3", "question-audio.mp3", "audio/mpeg", 3L);
+        AtomicLong saveInvocations = new AtomicLong();
 
-        // AtomicLong gives the lambda a mutable id counter (local variables captured by lambdas must be effectively final).
-        when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> {
-            MaterialNode node = invocation.getArgument(0);
-
-            if (node.getId() == null) {
-                node = MaterialNode.builder()
-                        .id(nodeIds.getAndIncrement())
-                        .materialId(node.getMaterialId())
-                        .parentNodeId(node.getParentNodeId())
-                        .kind(node.getKind())
-                        .title(node.getTitle())
-                        .displayOrder(node.getDisplayOrder())
-                        .skillId(node.getSkillId())
-                        .transcriptText(node.getTranscriptText())
-                        .responseMode(node.getResponseMode())
-                        .responseRequired(node.getResponseRequired())
-                        .scoringMode(node.getScoringMode())
-                        .config(node.getConfig())
-                        .version(node.getVersion())
-                        .createdAt(node.getCreatedAt())
-                        .updatedAt(node.getUpdatedAt())
-                        .build();
-            }
-
-            savedNodes.add(node);
-            return node;
-        });
-
-        when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> {
-            Material material = invocation.getArgument(0);
-            if (material.getId() == null) {
-                Material created = Material.builder()
-                        .id(materialIds.getAndIncrement())
-                        .examFamilyId(material.getExamFamilyId())
-                        .title(material.getTitle())
-                        .description(material.getDescription())
-                        .authorId(material.getAuthorId())
-                        .ownerOrgId(material.getOwnerOrgId())
-                        .status(material.getStatus())
-                        .version(material.getVersion())
-                        .createdAt(material.getCreatedAt())
-                        .updatedAt(material.getUpdatedAt())
-                        .build();
-                if (material.getRoot() != null) {
-                    created.attachRoot(material.getRoot());
-                }
-                material = created;
-            }
-            Material savedMaterial = Material.builder()
-                    .id(material.getId())
-                    .examFamilyId(material.getExamFamilyId())
-                    .title(material.getTitle())
-                    .description(material.getDescription())
-                    .status(material.getStatus())
-                    .version(material.getVersion())
-                    .createdAt(material.getCreatedAt())
-                    .updatedAt(material.getUpdatedAt())
-                    .build();
-            if (material.getRoot() != null) {
-                savedMaterial.attachRoot(material.getRoot());
-            }
-            savedMaterials.add(savedMaterial);
-            return material;
-        });
+        when(materialRepository.save(any(Material.class))).thenAnswer(invocation ->
+                saveInvocations.incrementAndGet() == 1 ? persistedScaffold : finalAggregate
+        );
 
         Long materialId = service.uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand.builder()
                 .materialTitle("Draft section")
@@ -148,9 +92,82 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 ))
                 .build());
 
-        assertThat(materialId).isEqualTo(1000L);
-        assertThat(savedMaterials).hasSize(2);
-        assertThat(savedMaterials.getFirst().getRoot()).isNull();
+        var materialCaptor = forClass(Material.class);
+        verify(materialRepository, times(2)).save(materialCaptor.capture());
+        Material transientAggregate = materialCaptor.getAllValues().getFirst();
+        Material assetAugmentedAggregate = materialCaptor.getAllValues().get(1);
+        MaterialNode root = transientAggregate.getRoot();
+        MaterialNode part1 = root.childAt(0);
+        MaterialNode part2 = root.childAt(1);
+
+        assertAll(
+                () -> assertThat(materialId).isEqualTo(1000L),
+                () -> assertThat(transientAggregate.getId()).isNull(),
+                () -> assertThat(transientAggregate.getTitle()).isEqualTo("Draft section"),
+                () -> assertThat(transientAggregate.getVersion()).isEqualTo(0L),
+                () -> assertThat(root).isNotNull(),
+                () -> assertThat(root.getId()).isNull(),
+                () -> assertThat(root.getTitle()).isEqualTo("Draft section"),
+                () -> assertThat(part1.getId()).isNull(),
+                () -> assertThat(part1.getTitle()).isEqualTo("Part 1"),
+                () -> assertThat(part2.getId()).isNull(),
+                () -> assertThat(part2.getTitle()).isEqualTo("Part 2"),
+                () -> assertThat(part1.getChildren()).hasSize(7),
+                () -> assertThat(part2.getChildren()).hasSize(4),
+                () -> assertThat(part1.getAssets()).isEmpty(),
+                () -> assertThat(part1.childAt(0).getAssets()).isEmpty(),
+                () -> assertThat(part2.childAt(0).getAssets()).isEmpty(),
+                () -> assertThat(part2.childAt(1).getAssets()).isEmpty(),
+                () -> assertThat(part1.getChildren()).extracting(MaterialNode::getTranscriptText).containsExactly(
+                        "Part 1 question 1", null, null, null, null, null, null),
+                () -> assertThat(part2.getChildren()).extracting(MaterialNode::getTranscriptText).containsExactly(
+                        "Part 2 question 1", "Part 2 question 2", null, null),
+                () -> assertThat(assetAugmentedAggregate.getId()).isEqualTo(1000L),
+                () -> assertThat(assetAugmentedAggregate.getVersion()).isEqualTo(4L),
+                () -> assertThat(assetAugmentedAggregate.getRoot().getVersion()).isEqualTo(0L),
+                () -> assertThat(assetAugmentedAggregate.getRoot().childAt(0).getVersion()).isEqualTo(0L),
+                () -> assertThat(assetAugmentedAggregate.getRoot().childAt(1).getVersion()).isEqualTo(0L),
+                () -> assertThat(assetAugmentedAggregate.getRoot().childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                    assertThat(asset.getId()).isNull();
+                    assertThat(asset.getVersion()).isEqualTo(0L);
+                    assertThat(asset.getMaterialNodeId()).isEqualTo(9101L);
+                    assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.IMAGE);
+                    assertThat(asset.getStorageKey()).isEqualTo("speaking/1000/part1/image/image.png");
+                    assertThat(asset.getOriginalFilename()).isEqualTo("cover.png");
+                    assertThat(asset.getMimeType()).isEqualTo("image/png");
+                    assertThat(asset.getFileSizeBytes()).isEqualTo(3L);
+                }),
+                () -> assertThat(assetAugmentedAggregate.getRoot().childAt(0).childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                    assertThat(asset.getId()).isNull();
+                    assertThat(asset.getVersion()).isEqualTo(0L);
+                    assertThat(asset.getMaterialNodeId()).isEqualTo(9110L);
+                    assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+                    assertThat(asset.getStorageKey()).isEqualTo("speaking/1000/part1/audio/question_1.mp3");
+                    assertThat(asset.getOriginalFilename()).isEqualTo("question-audio.mp3");
+                    assertThat(asset.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(asset.getFileSizeBytes()).isEqualTo(3L);
+                }),
+                () -> assertThat(assetAugmentedAggregate.getRoot().childAt(1).childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                    assertThat(asset.getId()).isNull();
+                    assertThat(asset.getVersion()).isEqualTo(0L);
+                    assertThat(asset.getMaterialNodeId()).isEqualTo(9120L);
+                    assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+                    assertThat(asset.getStorageKey()).isEqualTo("speaking/1000/part2/audio/question_1.mp3");
+                    assertThat(asset.getOriginalFilename()).isEqualTo("question-audio.mp3");
+                    assertThat(asset.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(asset.getFileSizeBytes()).isEqualTo(3L);
+                }),
+                () -> assertThat(assetAugmentedAggregate.getRoot().childAt(1).childAt(1).getAssets()).singleElement().satisfies(asset -> {
+                    assertThat(asset.getId()).isNull();
+                    assertThat(asset.getVersion()).isEqualTo(0L);
+                    assertThat(asset.getMaterialNodeId()).isEqualTo(9121L);
+                    assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+                    assertThat(asset.getStorageKey()).isEqualTo("speaking/1000/part2/audio/question_2.mp3");
+                    assertThat(asset.getOriginalFilename()).isEqualTo("question-audio.mp3");
+                    assertThat(asset.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(asset.getFileSizeBytes()).isEqualTo(3L);
+                })
+        );
 
         var storageKeyCaptor = forClass(String.class);
         verify(storageRepositoryPort, times(4)).uploadObject(eq("toefl"), storageKeyCaptor.capture(), any());
@@ -161,62 +178,236 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 "speaking/1000/part2/audio/question_2.mp3"
         );
 
-        MaterialNode root = savedNodes.stream()
-                .filter(node -> node.getKind() == MaterialNodeKind.SECTION)
-                .findFirst()
-                .orElseThrow();
+    }
 
-        assertThat(root.getMaterialId()).isEqualTo(materialId);
-        assertThat(savedMaterials.get(1).getRootId()).isEqualTo(root.getId());
+    @Test
+    void uploadSpeakingSection_withoutFiles_buildsCompleteTransientScaffoldBeforeSingleAggregateSave() {
+        Material persistedAggregate = persistedSpeakingScaffoldMaterial(
+                9000L,
+                "Untitled Draft",
+                "Draft description"
+        );
 
-        MaterialNode part1 = savedNodes.stream()
-                .filter(node -> root.getId().equals(node.getParentNodeId()) && node.getDisplayOrder() == 0)
-                .findFirst()
-                .orElseThrow();
+        when(materialRepository.save(any(Material.class))).thenReturn(persistedAggregate);
 
-        assertThat(part1.getMaterialId()).isEqualTo(materialId);
+        Long materialId = service.uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand.builder()
+                .materialTitle("   ")
+                .materialDescription("Draft description")
+                .partTitle("Part 1")
+                .questions(List.of(
+                        SpeakingQuestionUploadCommand.builder()
+                                .transcriptText("Part 1 question 1")
+                                .config(Map.of("prepTimeSeconds", 15))
+                                .build()
+                ))
+                .part2Title("Part 2")
+                .part2Questions(List.of(
+                        SpeakingQuestionUploadCommand.builder()
+                                .transcriptText("Part 2 question 1")
+                                .build(),
+                        SpeakingQuestionUploadCommand.builder()
+                                .transcriptText("Part 2 question 2")
+                                .config(Map.of("prepTimeSeconds", 30))
+                                .build()
+                ))
+                .build());
 
-        MaterialNode part2 = savedNodes.stream()
-                .filter(node -> root.getId().equals(node.getParentNodeId()) && node.getDisplayOrder() == 1)
-                .findFirst()
-                .orElseThrow();
+        var materialCaptor = forClass(Material.class);
+        verify(materialRepository, times(1)).save(materialCaptor.capture());
+        Material transientAggregate = materialCaptor.getValue();
+        MaterialNode root = transientAggregate.getRoot();
 
-        assertThat(part2.getMaterialId()).isEqualTo(materialId);
+        assertAll(
+                () -> assertThat(materialId).isEqualTo(persistedAggregate.getId()),
+                () -> assertThat(materialCaptor.getAllValues()).hasSize(1),
+                () -> assertThat(transientAggregate.getId()).isNull(),
+                () -> assertThat(transientAggregate.getTitle()).isEqualTo("Untitled Draft"),
+                () -> assertThat(transientAggregate.getDescription()).isEqualTo("Draft description"),
+                () -> assertThat(transientAggregate.getVersion()).isEqualTo(0L),
+                () -> {
+                    MaterialNode verifiedRoot = Objects.requireNonNull(root);
 
-        List<MaterialNode> part1Questions = savedNodes.stream()
-                .filter(node -> part1.getId().equals(node.getParentNodeId()))
-                .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
-                .toList();
+                    List<MaterialNode> rootChildren = verifiedRoot.getChildren().stream()
+                            .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
+                            .toList();
+                    MaterialNode part1 = rootChildren.get(0);
+                    MaterialNode part2 = rootChildren.get(1);
+                    List<MaterialNode> part1Questions = part1.getChildren().stream()
+                            .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
+                            .toList();
+                    List<MaterialNode> part2Questions = part2.getChildren().stream()
+                            .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
+                            .toList();
 
-        assertThat(part1Questions).extracting(MaterialNode::getMaterialId).containsOnly(materialId);
+                    assertAll(
+                            () -> assertThat(verifiedRoot.getId()).isNull(),
+                            () -> assertThat(verifiedRoot.getKind()).isEqualTo(MaterialNodeKind.SECTION),
+                            () -> assertThat(verifiedRoot.getTitle()).isEqualTo("Untitled Draft"),
+                            () -> assertThat(verifiedRoot.getDisplayOrder()).isEqualTo(0),
+                            () -> assertThat(verifiedRoot.getVersion()).isEqualTo(0L),
+                            () -> assertThat(rootChildren).hasSize(2),
+                            () -> assertThat(part1.getId()).isNull(),
+                            () -> assertThat(part1.getTitle()).isEqualTo("Part 1"),
+                            () -> assertThat(part1.getDisplayOrder()).isEqualTo(0),
+                            () -> assertThat(part1.getVersion()).isEqualTo(0L),
+                            () -> assertThat(part2.getId()).isNull(),
+                            () -> assertThat(part2.getTitle()).isEqualTo("Part 2"),
+                            () -> assertThat(part2.getDisplayOrder()).isEqualTo(1),
+                            () -> assertThat(part2.getVersion()).isEqualTo(0L),
+                            () -> assertThat(part1Questions).hasSize(7),
+                            () -> assertThat(part2Questions).hasSize(4),
+                            () -> assertThat(part1Questions).extracting(MaterialNode::getId).containsOnlyNulls(),
+                            () -> assertThat(part2Questions).extracting(MaterialNode::getId).containsOnlyNulls(),
+                            () -> assertThat(part1Questions).extracting(MaterialNode::getDisplayOrder).containsExactly(0, 1, 2, 3, 4, 5, 6),
+                            () -> assertThat(part2Questions).extracting(MaterialNode::getDisplayOrder).containsExactly(0, 1, 2, 3),
+                            () -> assertThat(part1Questions).extracting(MaterialNode::getTitle).containsExactly(
+                                    "Question 1", "Question 2", "Question 3", "Question 4", "Question 5", "Question 6", "Question 7"),
+                            () -> assertThat(part2Questions).extracting(MaterialNode::getTitle).containsExactly(
+                                    "Question 1", "Question 2", "Question 3", "Question 4"),
+                            () -> assertThat(part1Questions).extracting(MaterialNode::getTranscriptText).containsExactly(
+                                    "Part 1 question 1", null, null, null, null, null, null),
+                            () -> assertThat(part2Questions).extracting(MaterialNode::getTranscriptText).containsExactly(
+                                    "Part 2 question 1", "Part 2 question 2", null, null),
+                            () -> assertThat(part1Questions.getFirst().getConfig()).containsEntry("prepTimeSeconds", 15),
+                            () -> assertThat(part1Questions.get(1).getConfig()).isEmpty(),
+                            () -> assertThat(part2Questions.get(1).getConfig()).containsEntry("prepTimeSeconds", 30),
+                            () -> assertThat(part2Questions.get(2).getConfig()).isEmpty()
+                    );
+                },
+                () -> verify(storageRepositoryPort, never()).uploadObject(eq("toefl"), any(String.class), any())
+        );
+    }
 
-        List<MaterialNode> part2Questions = savedNodes.stream()
-                .filter(node -> part2.getId().equals(node.getParentNodeId()))
-                .sorted(Comparator.comparing(MaterialNode::getDisplayOrder))
-                .toList();
+    @Test
+    void uploadSpeakingSection_withFiles_attachesInitialAssetsToPersistedAggregateBeforeSingleFinalAggregateSave() {
+        Material persistedScaffold = persistedSpeakingScaffoldMaterial(
+                9100L,
+                "Draft section",
+                "Draft description"
+        );
+        Material finalAggregate = persistedSpeakingScaffoldMaterialWithInitialAssets(
+                9100L,
+                "Draft section",
+                "Draft description"
+        );
+        AtomicLong saveInvocations = new AtomicLong();
 
-        assertThat(part2Questions).extracting(MaterialNode::getMaterialId).containsOnly(materialId);
+        when(materialRepository.save(any(Material.class))).thenAnswer(invocation ->
+                saveInvocations.incrementAndGet() == 1 ? persistedScaffold : finalAggregate
+        );
 
-        assertThat(part1Questions)
-                .extracting(MaterialNode::getDisplayOrder, MaterialNode::getTranscriptText)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(0, "Part 1 question 1"),
-                        org.assertj.core.groups.Tuple.tuple(1, null),
-                        org.assertj.core.groups.Tuple.tuple(2, null),
-                        org.assertj.core.groups.Tuple.tuple(3, null),
-                        org.assertj.core.groups.Tuple.tuple(4, null),
-                        org.assertj.core.groups.Tuple.tuple(5, null),
-                        org.assertj.core.groups.Tuple.tuple(6, null)
-                );
+        Long materialId = service.uploadSpeakingSection(TOEFLSpeakingSectionUploadCommand.builder()
+                .materialTitle("Draft section")
+                .materialDescription("Draft description")
+                .partTitle("Part 1")
+                .partImage(UploadedFileCommand.builder()
+                        .originalFilename("cover.png")
+                        .contentType("image/png")
+                        .size(3L)
+                        .bytes(new byte[]{1, 2, 3})
+                        .build())
+                .questions(List.of(SpeakingQuestionUploadCommand.builder()
+                        .transcriptText("Part 1 question 1")
+                        .audio(UploadedFileCommand.builder()
+                                .originalFilename("part1-question1.mp3")
+                                .contentType("audio/mpeg")
+                                .size(11L)
+                                .bytes(new byte[]{4, 5, 6})
+                                .build())
+                        .build()))
+                .part2Title("Part 2")
+                .part2Questions(List.of(SpeakingQuestionUploadCommand.builder()
+                        .transcriptText("Part 2 question 1")
+                        .audio(UploadedFileCommand.builder()
+                                .originalFilename("part2-question1.mp3")
+                                .contentType("audio/mpeg")
+                                .size(12L)
+                                .bytes(new byte[]{7, 8, 9})
+                                .build())
+                        .build()))
+                .build());
 
-        assertThat(part2Questions)
-                .extracting(MaterialNode::getDisplayOrder, MaterialNode::getTranscriptText)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(0, "Part 2 question 1"),
-                        org.assertj.core.groups.Tuple.tuple(1, "Part 2 question 2"),
-                        org.assertj.core.groups.Tuple.tuple(2, null),
-                        org.assertj.core.groups.Tuple.tuple(3, null)
-                );
+        var materialCaptor = forClass(Material.class);
+        verify(materialRepository, atLeastOnce()).save(materialCaptor.capture());
+        Material firstSavedAggregate = materialCaptor.getAllValues().getFirst();
+
+        assertAll(
+                () -> assertThat(materialId).isEqualTo(finalAggregate.getId()),
+                () -> assertThat(materialCaptor.getAllValues()).hasSize(2),
+                () -> assertThat(firstSavedAggregate.getId()).isNull(),
+                () -> assertThat(firstSavedAggregate.getVersion()).isEqualTo(0L),
+                () -> assertThat(firstSavedAggregate.getRoot()).isNotNull(),
+                () -> assertThat(firstSavedAggregate.getRoot().childAt(0).getAssets()).isEmpty(),
+                () -> assertThat(firstSavedAggregate.getRoot().childAt(0).childAt(0).getAssets()).isEmpty(),
+                () -> assertThat(firstSavedAggregate.getRoot().childAt(1).childAt(0).getAssets()).isEmpty(),
+                () -> assertThat(persistedScaffold.getVersion()).isEqualTo(3L),
+                () -> assertThat(persistedScaffold.getRoot().getVersion()).isEqualTo(0L),
+                () -> assertThat(persistedScaffold.getRoot().childAt(0).getVersion()).isEqualTo(0L),
+                () -> assertThat(persistedScaffold.getRoot().childAt(0).childAt(0).getVersion()).isEqualTo(0L),
+                () -> assertThat(persistedScaffold.getRoot().childAt(1).childAt(0).getVersion()).isEqualTo(0L),
+                () -> assertThat(persistedScaffold.getRoot().childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                    assertThat(asset.getId()).isNull();
+                    assertThat(asset.getVersion()).isEqualTo(0L);
+                    assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.IMAGE);
+                    assertThat(asset.getMaterialNodeId()).isEqualTo(9101L);
+                    assertThat(asset.getStorageKey()).isEqualTo("speaking/9100/part1/image/image.png");
+                    assertThat(asset.getOriginalFilename()).isEqualTo("cover.png");
+                    assertThat(asset.getMimeType()).isEqualTo("image/png");
+                    assertThat(asset.getFileSizeBytes()).isEqualTo(3L);
+                }),
+                () -> assertThat(persistedScaffold.getRoot().childAt(0).childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                    assertThat(asset.getId()).isNull();
+                    assertThat(asset.getVersion()).isEqualTo(0L);
+                    assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+                    assertThat(asset.getMaterialNodeId()).isEqualTo(9110L);
+                    assertThat(asset.getStorageKey()).isEqualTo("speaking/9100/part1/audio/question_1.mp3");
+                    assertThat(asset.getOriginalFilename()).isEqualTo("part1-question1.mp3");
+                    assertThat(asset.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(asset.getFileSizeBytes()).isEqualTo(11L);
+                }),
+                () -> assertThat(persistedScaffold.getRoot().childAt(1).childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                    assertThat(asset.getId()).isNull();
+                    assertThat(asset.getVersion()).isEqualTo(0L);
+                    assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+                    assertThat(asset.getMaterialNodeId()).isEqualTo(9120L);
+                    assertThat(asset.getStorageKey()).isEqualTo("speaking/9100/part2/audio/question_1.mp3");
+                    assertThat(asset.getOriginalFilename()).isEqualTo("part2-question1.mp3");
+                    assertThat(asset.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(asset.getFileSizeBytes()).isEqualTo(12L);
+                }),
+                () -> {
+                    if (materialCaptor.getAllValues().size() < 2) {
+                        return;
+                    }
+
+                    Material secondSavedAggregate = materialCaptor.getAllValues().get(1);
+                    assertThat(secondSavedAggregate.getId()).isEqualTo(9100L);
+                    assertThat(secondSavedAggregate.getVersion()).isEqualTo(3L);
+                    assertThat(secondSavedAggregate.getRoot().childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                        assertThat(asset.getId()).isNull();
+                        assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.IMAGE);
+                        assertThat(asset.getStorageKey()).isEqualTo("speaking/9100/part1/image/image.png");
+                    });
+                    assertThat(secondSavedAggregate.getRoot().childAt(0).childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                        assertThat(asset.getId()).isNull();
+                        assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+                        assertThat(asset.getStorageKey()).isEqualTo("speaking/9100/part1/audio/question_1.mp3");
+                    });
+                    assertThat(secondSavedAggregate.getRoot().childAt(1).childAt(0).getAssets()).singleElement().satisfies(asset -> {
+                        assertThat(asset.getId()).isNull();
+                        assertThat(asset.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+                        assertThat(asset.getStorageKey()).isEqualTo("speaking/9100/part2/audio/question_1.mp3");
+                    });
+                }
+        );
+
+        var storageKeyCaptor = forClass(String.class);
+        verify(storageRepositoryPort, times(3)).uploadObject(eq("toefl"), storageKeyCaptor.capture(), any());
+        assertThat(storageKeyCaptor.getAllValues()).containsExactly(
+                "speaking/9100/part1/image/image.png",
+                "speaking/9100/part1/audio/question_1.mp3",
+                "speaking/9100/part2/audio/question_1.mp3"
+        );
     }
 
     private static SpeakingQuestionUploadCommand question(String transcriptText) {
@@ -232,37 +423,107 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     }
 
     @Test
-    void deleteSpeakingSection_deletesTreeAndCleansStorageKeys() {
+    void deleteSpeakingSection_collectsStorageKeysFromAggregateAndDeletesThroughMaterialRepositoryBoundary() {
         Long materialId = 77L;
         Long rootNodeId = 100L;
-        Long childNodeId = 101L;
+        Long part1NodeId = 101L;
+        Long part1QuestionNodeId = 102L;
+        Long part2NodeId = 103L;
+        Long part2QuestionNodeId = 104L;
 
-        Material material = Material.builder().id(materialId).build();
-        material.attachRoot(MaterialNode.builder().id(rootNodeId).materialId(materialId).build());
+        Material material = Material.builder().id(materialId).version(5L).build();
+        MaterialNode root = MaterialNode.builder()
+                .id(rootNodeId)
+                .materialId(materialId)
+                .kind(MaterialNodeKind.SECTION)
+                .title("Section")
+                .version(2L)
+                .build();
+        MaterialNode part1 = MaterialNode.builder()
+                .id(part1NodeId)
+                .materialId(materialId)
+                .parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART)
+                .displayOrder(0)
+                .title("Part 1")
+                .version(0L)
+                .build();
+        MaterialNode part1Question = MaterialNode.builder()
+                .id(part1QuestionNodeId)
+                .materialId(materialId)
+                .parentNodeId(part1NodeId)
+                .kind(MaterialNodeKind.ITEM)
+                .displayOrder(0)
+                .title("Question 1")
+                .version(0L)
+                .build();
+        MaterialNode part2 = MaterialNode.builder()
+                .id(part2NodeId)
+                .materialId(materialId)
+                .parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART)
+                .displayOrder(1)
+                .title("Part 2")
+                .version(0L)
+                .build();
+        MaterialNode part2Question = MaterialNode.builder()
+                .id(part2QuestionNodeId)
+                .materialId(materialId)
+                .parentNodeId(part2NodeId)
+                .kind(MaterialNodeKind.ITEM)
+                .displayOrder(0)
+                .title("Question 1")
+                .version(0L)
+                .build();
+
+        root.addAsset(MaterialAsset.builder()
+                .id(7000L)
+                .materialNodeId(rootNodeId)
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey("speaking/shared/duplicate.png")
+                .build());
+        part1.addAsset(MaterialAsset.builder()
+                .id(7001L)
+                .materialNodeId(part1NodeId)
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey("speaking/shared/duplicate.png")
+                .build());
+        part1Question.addAsset(MaterialAsset.builder()
+                .id(7002L)
+                .materialNodeId(part1QuestionNodeId)
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("speaking/77/part1/audio/question_1.mp3")
+                .build());
+        part2Question.addAsset(MaterialAsset.builder()
+                .id(7003L)
+                .materialNodeId(part2QuestionNodeId)
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey("speaking/77/part2/audio/question_1.mp3")
+                .build());
+        part2Question.addAsset(MaterialAsset.builder()
+                .id(7004L)
+                .materialNodeId(part2QuestionNodeId)
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey(null)
+                .build());
+
+        part1.addChild(part1Question);
+        part2.addChild(part2Question);
+        root.addChild(part1);
+        root.addChild(part2);
+        material.attachRoot(root);
+
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(
-                MaterialNode.builder().id(childNodeId).parentNodeId(rootNodeId).build()
-        ));
-        when(materialNodeRepository.findByParentNodeId(childNodeId)).thenReturn(List.of());
-
-        MaterialAsset rootAsset = MaterialAsset.builder()
-                .kind(MaterialAsset.Kind.AUDIO)
-                .storageKey("speaking/root-audio.mp3")
-                .build();
-        MaterialAsset childAsset = MaterialAsset.builder()
-                .kind(MaterialAsset.Kind.AUDIO)
-                .storageKey("speaking/child-audio.mp3")
-                .build();
-
-        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of(rootAsset));
-        when(materialAssetRepository.findByMaterialNodeId(childNodeId)).thenReturn(List.of(childAsset));
 
         service.deleteSpeakingSection(materialId);
 
-        verify(materialNodeRepository, times(1)).deleteById(rootNodeId);
-        verify(materialRepository, times(1)).delete(materialId);
-        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/root-audio.mp3");
-        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/child-audio.mp3");
+        assertAll(
+                () -> verify(materialRepository, times(1)).delete(materialId),
+                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/shared/duplicate.png"),
+                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/77/part1/audio/question_1.mp3"),
+                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/77/part2/audio/question_1.mp3"),
+                () -> verify(storageRepositoryPort, never()).deleteObject(eq("toefl"), isNull())
+        );
 
         var eventIdCaptor = forClass(java.util.UUID.class);
         var aggregateTypeCaptor = forClass(String.class);
@@ -299,26 +560,15 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
 
         MaterialAsset imageAsset = MaterialAsset.builder()
+                .id(5001L)
                 .materialNodeId(part1NodeId)
                 .kind(MaterialAsset.Kind.IMAGE)
                 .storageKey("speaking/88/part1/image/old-image.png")
                 .version(3L)
                 .build();
-
-        List<MaterialAsset> part1Assets = new ArrayList<>(List.of(imageAsset));
-
-        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenAnswer(invocation -> part1Assets);
-        when(materialAssetRepository.save(any(MaterialAsset.class))).thenAnswer(invocation -> {
-            MaterialAsset saved = invocation.getArgument(0);
-            part1Assets.clear();
-            part1Assets.add(saved);
-            return saved;
-        });
+        part1.addAsset(imageAsset);
 
         UploadedFileCommand newImage = UploadedFileCommand.builder()
                 .originalFilename("new-image.png")
@@ -338,6 +588,318 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), uploadKeyCaptor.capture(), any());
         assertThat(uploadKeyCaptor.getValue()).isEqualTo("speaking/88/part1/image/image.png");
         verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/88/part1/image/old-image.png");
+        verify(materialRepository, times(1)).save(material);
+    }
+
+    @Test
+    void updateSpeakingSection_existingQuestionAudioReplacement_updatesAttachedAggregateAndSavesItOnce() {
+        Long materialId = 91L;
+        Long rootNodeId = 410L;
+        Long part1NodeId = 411L;
+        Long questionNodeId = 412L;
+        Long assetId = 6100L;
+        String existingKey = "speaking/91/part1/audio/question_1.mp3";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode question = questionNode(materialId, questionNodeId, part1NodeId, 0, "Original transcript");
+        MaterialAsset attachedAudio = audioAsset(assetId, questionNodeId, existingKey, "old-question.mp3", 1000L, 5L);
+        question.addAsset(attachedAudio);
+        part1.addChild(question);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .questions(List.of(SpeakingQuestionPartialUpdateCommand.builder()
+                        .index(0)
+                        .audio(UploadedFileCommand.builder()
+                                .originalFilename("replacement.mp3")
+                                .contentType("audio/mpeg")
+                                .size(12345L)
+                                .bytes(new byte[]{1, 2, 3})
+                                .build())
+                        .build()))
+                .build());
+
+        assertAll(
+                () -> {
+                    MaterialAsset aggregateAudio = question.getAssets().getFirst();
+                    assertThat(aggregateAudio.getId()).isEqualTo(assetId);
+                    assertThat(aggregateAudio.getStorageKey()).isEqualTo(existingKey);
+                    assertThat(aggregateAudio.getOriginalFilename()).isEqualTo("replacement.mp3");
+                    assertThat(aggregateAudio.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(aggregateAudio.getFileSizeBytes()).isEqualTo(12345L);
+                    assertThat(aggregateAudio.getVersion()).isEqualTo(6L);
+                    assertThat(material.getVersion()).isEqualTo(2L);
+                },
+                () -> {
+                    var materialCaptor = forClass(Material.class);
+                    verify(materialRepository, times(1)).save(materialCaptor.capture());
+                    Material saved = materialCaptor.getValue();
+                    MaterialAsset savedAudio = saved.getRoot().childAt(0).childAt(0).getAssets().getFirst();
+                    assertThat(saved).isSameAs(material);
+                    assertThat(savedAudio).isSameAs(attachedAudio);
+                    assertThat(savedAudio.getId()).isEqualTo(assetId);
+                    assertThat(savedAudio.getStorageKey()).isEqualTo(existingKey);
+                    assertThat(savedAudio.getOriginalFilename()).isEqualTo("replacement.mp3");
+                    assertThat(savedAudio.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(savedAudio.getFileSizeBytes()).isEqualTo(12345L);
+                    assertThat(savedAudio.getVersion()).isEqualTo(6L);
+                    assertThat(saved.getVersion()).isEqualTo(2L);
+                },
+                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(existingKey), any()),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", existingKey)
+        );
+    }
+
+    @Test
+    void updateSpeakingSection_questionContentAndExistingAudioReplacement_savesSingleAggregateWithBothChanges() {
+        Long materialId = 92L;
+        Long rootNodeId = 420L;
+        Long part1NodeId = 421L;
+        Long questionNodeId = 422L;
+        Long assetId = 6200L;
+        String existingKey = "speaking/92/part1/audio/question_1.mp3";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode question = questionNode(materialId, questionNodeId, part1NodeId, 0, "Original transcript");
+        question.updateConfig(Map.of("responseTimeSeconds", 30));
+        MaterialAsset attachedAudio = audioAsset(assetId, questionNodeId, existingKey, "old-question.mp3", 1000L, 5L);
+        question.addAsset(attachedAudio);
+        part1.addChild(question);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        Map<String, Object> updatedConfig = Map.of("responseTimeSeconds", 45);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .questions(List.of(SpeakingQuestionPartialUpdateCommand.builder()
+                        .index(0)
+                        .transcriptText("Updated transcript")
+                        .config(updatedConfig)
+                        .audio(UploadedFileCommand.builder()
+                                .originalFilename("replacement.mp3")
+                                .contentType("audio/mpeg")
+                                .size(12345L)
+                                .bytes(new byte[]{4, 5, 6})
+                                .build())
+                        .build()))
+                .build());
+
+        assertAll(
+                () -> {
+                    MaterialAsset aggregateAudio = question.getAssets().getFirst();
+                    assertThat(question.getTranscriptText()).isEqualTo("Updated transcript");
+                    assertThat(question.getConfig()).isEqualTo(updatedConfig);
+                    assertThat(aggregateAudio.getId()).isEqualTo(assetId);
+                    assertThat(aggregateAudio.getStorageKey()).isEqualTo(existingKey);
+                    assertThat(aggregateAudio.getOriginalFilename()).isEqualTo("replacement.mp3");
+                    assertThat(aggregateAudio.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(aggregateAudio.getFileSizeBytes()).isEqualTo(12345L);
+                    assertThat(aggregateAudio.getVersion()).isEqualTo(6L);
+                    assertThat(material.getVersion()).isEqualTo(4L);
+                },
+                () -> {
+                    var materialCaptor = forClass(Material.class);
+                    verify(materialRepository, times(1)).save(materialCaptor.capture());
+                    Material saved = materialCaptor.getValue();
+                    MaterialNode savedQuestion = saved.getRoot().childAt(0).childAt(0);
+                    MaterialAsset savedAudio = savedQuestion.getAssets().getFirst();
+                    assertThat(savedQuestion.getTranscriptText()).isEqualTo("Updated transcript");
+                    assertThat(savedQuestion.getConfig()).isEqualTo(updatedConfig);
+                    assertThat(savedAudio).isSameAs(attachedAudio);
+                    assertThat(savedAudio.getId()).isEqualTo(assetId);
+                    assertThat(savedAudio.getStorageKey()).isEqualTo(existingKey);
+                    assertThat(savedAudio.getOriginalFilename()).isEqualTo("replacement.mp3");
+                    assertThat(savedAudio.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(savedAudio.getFileSizeBytes()).isEqualTo(12345L);
+                    assertThat(savedAudio.getVersion()).isEqualTo(6L);
+                    assertThat(saved.getVersion()).isEqualTo(4L);
+                },
+                () -> verify(materialRepository, times(1)).save(any(Material.class)),
+                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(existingKey), any()),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", existingKey)
+        );
+    }
+
+    @Test
+    void updateSpeakingSection_newQuestionAudio_attachesNewAggregateAssetAndSavesOnce() {
+        Long materialId = 93L;
+        Long rootNodeId = 430L;
+        Long part1NodeId = 431L;
+        Long questionNodeId = 432L;
+        String newKey = "speaking/93/part1/audio/question_1.mp3";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode question = questionNode(materialId, questionNodeId, part1NodeId, 0, "Original transcript");
+        part1.addChild(question);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .questions(List.of(SpeakingQuestionPartialUpdateCommand.builder()
+                        .index(0)
+                        .audio(UploadedFileCommand.builder()
+                                .originalFilename("question.mp3")
+                                .contentType("audio/mpeg")
+                                .size(321L)
+                                .bytes(new byte[]{1, 2, 3})
+                                .build())
+                        .build()))
+                .build());
+
+        assertAll(
+                () -> assertThat(question.getAssets()).singleElement().satisfies(created -> {
+                    assertThat(created.getId()).isNull();
+                    assertThat(created.getMaterialNodeId()).isEqualTo(questionNodeId);
+                    assertThat(created.getKind()).isEqualTo(MaterialAsset.Kind.AUDIO);
+                    assertThat(created.getStorageKey()).isEqualTo(newKey);
+                    assertThat(created.getOriginalFilename()).isEqualTo("question.mp3");
+                    assertThat(created.getMimeType()).isEqualTo("audio/mpeg");
+                    assertThat(created.getFileSizeBytes()).isEqualTo(321L);
+                    assertThat(created.getVersion()).isEqualTo(0L);
+                }),
+                () -> {
+                    var materialCaptor = forClass(Material.class);
+                    verify(materialRepository, times(1)).save(materialCaptor.capture());
+                    Material saved = materialCaptor.getValue();
+                    assertThat(saved).isSameAs(material);
+                    assertThat(saved.getVersion()).isEqualTo(2L);
+                    assertThat(saved.getRoot().childAt(0).childAt(0).getVersion()).isNull();
+                    assertThat(saved.getRoot().childAt(0).childAt(0).getAssets()).singleElement().satisfies(created -> {
+                        assertThat(created.getId()).isNull();
+                        assertThat(created.getStorageKey()).isEqualTo(newKey);
+                        assertThat(created.getVersion()).isEqualTo(0L);
+                    });
+                },
+                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(newKey), any())
+        );
+    }
+
+    @Test
+    void updateSpeakingSection_existingPartImageReplacement_updatesAttachedAggregateAndSavesOnce() {
+        Long materialId = 94L;
+        Long rootNodeId = 440L;
+        Long part1NodeId = 441L;
+        Long imageAssetId = 6400L;
+        String imageKey = "speaking/94/part1/image/image.png";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialAsset attachedImage = imageAsset(imageAssetId, part1NodeId, imageKey, "old-image.png", 10L, 5L);
+        part1.addAsset(attachedImage);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .partImage(UploadedFileCommand.builder()
+                        .originalFilename("replacement.png")
+                        .contentType("image/png")
+                        .size(222L)
+                        .bytes(new byte[]{4, 5, 6})
+                        .build())
+                .build());
+
+        assertAll(
+                () -> assertThat(part1.getAssets()).singleElement().satisfies(image -> {
+                    assertThat(image.getId()).isEqualTo(imageAssetId);
+                    assertThat(image.getStorageKey()).isEqualTo(imageKey);
+                    assertThat(image.getOriginalFilename()).isEqualTo("replacement.png");
+                    assertThat(image.getMimeType()).isEqualTo("image/png");
+                    assertThat(image.getFileSizeBytes()).isEqualTo(222L);
+                    assertThat(image.getVersion()).isEqualTo(6L);
+                }),
+                () -> {
+                    var materialCaptor = forClass(Material.class);
+                    verify(materialRepository, times(1)).save(materialCaptor.capture());
+                    Material saved = materialCaptor.getValue();
+                    assertThat(saved.getVersion()).isEqualTo(2L);
+                    assertThat(saved.getRoot().childAt(0).getVersion()).isEqualTo(1L);
+                    assertThat(saved.getRoot().childAt(0).getAssets()).singleElement().satisfies(image -> {
+                        assertThat(image.getId()).isEqualTo(imageAssetId);
+                        assertThat(image.getStorageKey()).isEqualTo(imageKey);
+                        assertThat(image.getOriginalFilename()).isEqualTo("replacement.png");
+                        assertThat(image.getVersion()).isEqualTo(6L);
+                    });
+                },
+                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(imageKey), any()),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", imageKey)
+        );
+    }
+
+    @Test
+    void updateSpeakingSection_newPartImage_attachesNewAggregateAssetAndSavesOnce() {
+        Long materialId = 95L;
+        Long rootNodeId = 450L;
+        Long part1NodeId = 451L;
+        String imageKey = "speaking/95/part1/image/image.png";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .partImage(UploadedFileCommand.builder()
+                        .originalFilename("cover.png")
+                        .contentType("image/png")
+                        .size(444L)
+                        .bytes(new byte[]{9, 8, 7})
+                        .build())
+                .build());
+
+        assertAll(
+                () -> assertThat(part1.getAssets()).singleElement().satisfies(image -> {
+                    assertThat(image.getId()).isNull();
+                    assertThat(image.getMaterialNodeId()).isEqualTo(part1NodeId);
+                    assertThat(image.getKind()).isEqualTo(MaterialAsset.Kind.IMAGE);
+                    assertThat(image.getStorageKey()).isEqualTo(imageKey);
+                    assertThat(image.getOriginalFilename()).isEqualTo("cover.png");
+                    assertThat(image.getMimeType()).isEqualTo("image/png");
+                    assertThat(image.getFileSizeBytes()).isEqualTo(444L);
+                    assertThat(image.getVersion()).isEqualTo(0L);
+                }),
+                () -> {
+                    var materialCaptor = forClass(Material.class);
+                    verify(materialRepository, times(1)).save(materialCaptor.capture());
+                    Material saved = materialCaptor.getValue();
+                    assertThat(saved.getVersion()).isEqualTo(2L);
+                    assertThat(saved.getRoot().childAt(0).getVersion()).isEqualTo(1L);
+                },
+                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(imageKey), any())
+        );
     }
 
     @Test
@@ -353,8 +915,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
 
         MaterialAsset imageAsset = MaterialAsset.builder()
                 .id(5000L)
@@ -362,40 +922,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .kind(MaterialAsset.Kind.IMAGE)
                 .storageKey("speaking/89/part1/image/old-image.png")
                 .build();
-
-        List<MaterialAsset> part1Assets = new ArrayList<>(List.of(imageAsset));
-        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenAnswer(invocation -> new ArrayList<>(part1Assets));
-        when(materialAssetRepository.findByMaterialNodeId(302L)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(303L)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(304L)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(305L)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(306L)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(307L)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(308L)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(309L)).thenReturn(List.of());
-
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(
-                MaterialNode.builder().id(302L).parentNodeId(part1NodeId).build(),
-                MaterialNode.builder().id(303L).parentNodeId(part1NodeId).build(),
-                MaterialNode.builder().id(304L).parentNodeId(part1NodeId).build(),
-                MaterialNode.builder().id(305L).parentNodeId(part1NodeId).build(),
-                MaterialNode.builder().id(306L).parentNodeId(part1NodeId).build(),
-                MaterialNode.builder().id(307L).parentNodeId(part1NodeId).build(),
-                MaterialNode.builder().id(308L).parentNodeId(part1NodeId).build()
-        ));
-        when(materialNodeRepository.findByParentNodeId(302L)).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(303L)).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(304L)).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(305L)).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(306L)).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(307L)).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(308L)).thenReturn(List.of());
-
-        doAnswer(invocation -> {
-            part1Assets.clear();
-            return null;
-        }).when(materialAssetRepository).deleteById(5000L);
+        part1.addAsset(imageAsset);
 
         TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
                 .materialId(materialId)
@@ -404,8 +931,48 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         service.updateSpeakingSection(command);
 
-        verify(materialAssetRepository, times(1)).deleteById(5000L);
+        assertThat(part1.getAssets()).isEmpty();
+        verify(materialRepository, times(1)).save(material);
         verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/89/part1/image/old-image.png");
+    }
+
+    @Test
+    void updateSpeakingSection_existingPartImageRemoval_removesFromAggregateAndSavesOnce() {
+        Long materialId = 96L;
+        Long rootNodeId = 460L;
+        Long part1NodeId = 461L;
+        Long assetId = 6500L;
+        String oldKey = "speaking/96/part1/image/image.png";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialAsset attachedImage = imageAsset(assetId, part1NodeId, oldKey, "cover.png", 100L, 5L);
+        part1.addAsset(attachedImage);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .removePartImage(true)
+                .build());
+
+        assertAll(
+                () -> assertThat(part1.getAssets()).isEmpty(),
+                () -> {
+                    var materialCaptor = forClass(Material.class);
+                    verify(materialRepository, times(1)).save(materialCaptor.capture());
+                    Material saved = materialCaptor.getValue();
+                    assertThat(saved.getVersion()).isEqualTo(2L);
+                    assertThat(saved.getRoot().childAt(0).getVersion()).isEqualTo(1L);
+                    assertThat(saved.getRoot().childAt(0).getAssets()).isEmpty();
+                },
+                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", oldKey)
+        );
     }
 
     @Test
@@ -425,25 +992,13 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
 
-        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(q0));
-        when(materialNodeRepository.findByParentNodeId(questionNodeId)).thenReturn(List.of());
-
         MaterialAsset audioAsset = MaterialAsset.builder()
                 .id(6000L)
                 .materialNodeId(questionNodeId)
                 .kind(MaterialAsset.Kind.AUDIO)
                 .storageKey("speaking/90/part1/audio/old-question.mp3")
                 .build();
-
-        List<MaterialAsset> qAssets = new ArrayList<>(List.of(audioAsset));
-        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(questionNodeId)).thenAnswer(invocation -> new ArrayList<>(qAssets));
-        doAnswer(invocation -> {
-            qAssets.clear();
-            return null;
-        }).when(materialAssetRepository).deleteById(6000L);
+        q0.addAsset(audioAsset);
 
         TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
                 .materialId(materialId)
@@ -454,10 +1009,158 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         service.updateSpeakingSection(command);
 
-        verify(materialAssetRepository, times(1)).deleteById(6000L);
+        assertThat(q0.getAssets()).isEmpty();
         verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/90/part1/audio/old-question.mp3");
-        assertThat(material.getVersion()).isEqualTo(1L);
-        verify(materialRepository, never()).save(any(Material.class));
+        assertThat(material.getVersion()).isEqualTo(2L);
+        verify(materialRepository, times(1)).save(material);
+    }
+
+    @Test
+    void updateSpeakingSection_existingQuestionAudioRemoval_removesFromAggregateAndSavesOnce() {
+        Long materialId = 97L;
+        Long rootNodeId = 470L;
+        Long part1NodeId = 471L;
+        Long questionNodeId = 472L;
+        Long assetId = 6600L;
+        String oldKey = "speaking/97/part1/audio/question_1.mp3";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode question = questionNode(materialId, questionNodeId, part1NodeId, 0, "Original transcript");
+        MaterialAsset attachedAudio = audioAsset(assetId, questionNodeId, oldKey, "old-question.mp3", 100L, 5L);
+        question.addAsset(attachedAudio);
+        part1.addChild(question);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .questions(List.of(SpeakingQuestionPartialUpdateCommand.builder().index(0).removeAudio(true).build()))
+                .build());
+
+        assertAll(
+                () -> assertThat(question.getAssets()).isEmpty(),
+                () -> {
+                    var materialCaptor = forClass(Material.class);
+                    verify(materialRepository, times(1)).save(materialCaptor.capture());
+                    Material saved = materialCaptor.getValue();
+                    assertThat(saved.getVersion()).isEqualTo(2L);
+                    assertThat(saved.getRoot().childAt(0).childAt(0).getVersion()).isNull();
+                    assertThat(saved.getRoot().childAt(0).childAt(0).getAssets()).isEmpty();
+                },
+                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", oldKey)
+        );
+    }
+
+    @Test
+    void updateSpeakingSection_absentImageAndAudioRemoval_isIdempotentApplicationNoOp() {
+        Long materialId = 98L;
+        Long rootNodeId = 480L;
+        Long part1NodeId = 481L;
+        Long questionNodeId = 482L;
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode question = questionNode(materialId, questionNodeId, part1NodeId, 0, "Original transcript");
+        part1.addChild(question);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .removePartImage(true)
+                .questions(List.of(SpeakingQuestionPartialUpdateCommand.builder().index(0).removeAudio(true).build()))
+                .build());
+
+        assertAll(
+                () -> assertThat(part1.getAssets()).isEmpty(),
+                () -> assertThat(question.getAssets()).isEmpty(),
+                () -> assertThat(material.getVersion()).isEqualTo(1L),
+                () -> assertThat(material.getUpdatedAt()).isEqualTo(ORIGINAL_TIME),
+                () -> verify(materialRepository, never()).save(any(Material.class))
+        );
+    }
+
+    @Test
+    void updateSpeakingSection_mixedTitleContentAudioReplacementAndImageRemoval_savesSingleFinalAggregate() {
+        Long materialId = 99L;
+        Long rootNodeId = 490L;
+        Long part1NodeId = 491L;
+        Long part2NodeId = 493L;
+        Long questionNodeId = 492L;
+        Long imageAssetId = 6700L;
+        Long audioAssetId = 6701L;
+        String imageKey = "speaking/99/part1/image/image.png";
+        String audioKey = "speaking/99/part1/audio/question_1.mp3";
+
+        Material material = Material.builder().id(materialId).title("Old Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Old Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part2 = MaterialNode.builder().id(part2NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(1).title("Part 2").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode question = questionNode(materialId, questionNodeId, part1NodeId, 0, "Original transcript");
+        MaterialAsset attachedImage = imageAsset(imageAssetId, part1NodeId, imageKey, "cover.png", 100L, 5L);
+        MaterialAsset attachedAudio = audioAsset(audioAssetId, questionNodeId, audioKey, "old-question.mp3", 200L, 5L);
+        part1.addAsset(attachedImage);
+        question.addAsset(attachedAudio);
+        part1.addChild(question);
+        root.addChild(part1);
+        root.addChild(part2);
+        material.attachRoot(root);
+
+        Map<String, Object> updatedConfig = Map.of("responseTimeSeconds", 45);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .materialTitle("New Material")
+                .removePartImage(true)
+                .questions(List.of(SpeakingQuestionPartialUpdateCommand.builder()
+                        .index(0)
+                        .transcriptText("Updated transcript")
+                        .config(updatedConfig)
+                        .audio(UploadedFileCommand.builder()
+                                .originalFilename("replacement.mp3")
+                                .contentType("audio/mpeg")
+                                .size(333L)
+                                .bytes(new byte[]{7, 7, 7})
+                                .build())
+                        .build()))
+                .build());
+
+        assertAll(
+                () -> {
+                    var materialCaptor = forClass(Material.class);
+                    verify(materialRepository, times(1)).save(materialCaptor.capture());
+                    Material saved = materialCaptor.getValue();
+                    MaterialNode savedPart1 = saved.getRoot().childAt(0);
+                    MaterialNode savedQuestion = savedPart1.childAt(0);
+                    assertThat(saved.getTitle()).isEqualTo("New Material");
+                    assertThat(saved.getRoot().getTitle()).isEqualTo("New Material");
+                    assertThat(savedPart1.getAssets()).isEmpty();
+                    assertThat(savedQuestion.getTranscriptText()).isEqualTo("Updated transcript");
+                    assertThat(savedQuestion.getConfig()).isEqualTo(updatedConfig);
+                    assertThat(savedQuestion.getAssets()).singleElement().satisfies(audio -> {
+                        assertThat(audio.getId()).isEqualTo(audioAssetId);
+                        assertThat(audio.getStorageKey()).isEqualTo(audioKey);
+                        assertThat(audio.getOriginalFilename()).isEqualTo("replacement.mp3");
+                    });
+                },
+                () -> verify(materialRepository, times(1)).save(any(Material.class))
+        );
     }
 
     @Test
@@ -475,10 +1178,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        // Storage scans remain allowed; do not stub separate part-title lookups.
-        when(materialNodeRepository.findByParentNodeId(root.getId())).thenReturn(List.of(part1, part2));
-        when(materialNodeRepository.findByParentNodeId(part1.getId())).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(part2.getId())).thenReturn(List.of());
 
         service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
                 .materialId(materialId)
@@ -512,12 +1211,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(event.getVersion()).isEqualTo(saved.getVersion());
                 },
                 () -> assertThat(event.getPart1Title()).isEqualTo(root.childAt(0).getTitle()),
-                () -> assertThat(event.getPart2Title()).isEqualTo(root.childAt(1).getTitle()),
-                () -> verify(materialNodeRepository, never()).save(root),
-                () -> verify(materialNodeRepository, never()).save(part1),
-                () -> verify(materialNodeRepository, never()).save(part2),
-                () -> verify(materialNodeRepository, never()).findByParentIdAndDisplayOrder(root.getId(), 0),
-                () -> verify(materialNodeRepository, never()).findByParentIdAndDisplayOrder(root.getId(), 1)
+                () -> assertThat(event.getPart2Title()).isEqualTo(root.childAt(1).getTitle())
         );
     }
 
@@ -537,16 +1231,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
         when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1, part2));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part2NodeId)).thenReturn(List.of());
 
         TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
                 .materialId(materialId)
@@ -603,16 +1288,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
         when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1, part2));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
-        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part2NodeId)).thenReturn(List.of());
 
         TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
                 .materialId(materialId)
@@ -675,10 +1351,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        // Keep the unrelated storage scans consistent with the loaded tree.
-        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(question));
-        when(materialNodeRepository.findByParentNodeId(questionNodeId)).thenReturn(List.of());
 
         Map<String, Object> updatedConfig = Map.of("responseTimeSeconds", 45);
         TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
@@ -705,9 +1377,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(saved.getVersion()).isEqualTo(3L);
                     assertThat(saved.getUpdatedAt()).isNotNull();
                     assertThat(savedQuestion.getVersion()).isEqualTo(2L);
-                },
-                () -> verify(materialNodeRepository, never()).save(argThat(node -> questionNodeId.equals(node.getId()))),
-                () -> verify(materialNodeRepository, never()).findByParentIdAndDisplayOrder(part1NodeId, questionIndex)
+                }
         );
         verify(outboxPort, never()).append(any(), any(), any(), any(), any());
     }
@@ -733,12 +1403,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         Map<String, Object> config = Map.of("responseTimeSeconds", 45);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findByParentNodeId(root.getId())).thenReturn(List.of(part1, part2));
-        when(materialNodeRepository.findByParentNodeId(part1.getId())).thenReturn(List.of(first, second));
-        when(materialNodeRepository.findByParentNodeId(part2.getId())).thenReturn(List.of(third));
-        // These reads remain for the existing title-event payload, not update navigation.
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(root.getId(), 0)).thenReturn(Optional.of(part1));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(root.getId(), 1)).thenReturn(Optional.of(part2));
         when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> {
             Material saved = invocation.getArgument(0);
             // Check at invocation time so an early save cannot pass through later object mutation.
@@ -763,11 +1427,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build());
 
         verify(materialRepository).save(material);
-        verify(materialNodeRepository, never()).findById(root.getId());
-        for (MaterialNode question : List.of(first, second, third)) {
-            verify(materialNodeRepository, never()).findByParentIdAndDisplayOrder(question.getParentNodeId(), question.getDisplayOrder());
-            verify(materialNodeRepository, never()).save(question);
-        }
         var eventCaptor = forClass(MaterialDetailsUpsertedEvent.class);
         verify(outboxPort).append(any(), eq("Material"), eq(materialId.toString()),
                 eq(MATERIAL_DETAILS_UPSERTED), eventCaptor.capture());
@@ -793,7 +1452,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         assertThat(material.getRoot().getVersion()).isEqualTo(3L);
         assertThat(material.getRoot().childAt(1 - partIndex).getVersion()).isEqualTo(3L);
         verify(materialRepository).save(material);
-        verify(materialNodeRepository, never()).save(any());
         var eventCaptor = forClass(MaterialDetailsUpsertedEvent.class);
         verify(outboxPort).append(any(), eq("Material"), eq(material.getId().toString()),
                 eq(MATERIAL_DETAILS_UPSERTED), eventCaptor.capture());
@@ -830,7 +1488,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         assertThat(material.getRoot().getVersion()).isEqualTo(3L);
         assertThat(material.getRoot().childAt(partIndex).getVersion()).isEqualTo(3L);
         verify(materialRepository).save(material);
-        verify(materialNodeRepository, never()).save(any());
         verify(outboxPort, never()).append(any(), any(), any(), any(), any());
     }
 
@@ -861,7 +1518,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
             assertThat(part.childAt(0).getUpdatedAt()).isEqualTo(ORIGINAL_TIME);
         }
         verify(materialRepository, never()).save(any());
-        verify(materialNodeRepository, never()).save(any());
         verify(outboxPort, never()).append(any(), any(), any(), any(), any());
     }
 
@@ -904,7 +1560,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         assertThat(material.getRoot().childAt(0).getVersion()).isEqualTo(3L);
         assertThat(material.getRoot().childAt(1).getVersion()).isEqualTo(3L);
         verify(materialRepository).save(material);
-        verify(materialNodeRepository, never()).save(any());
         var eventCaptor = forClass(MaterialDetailsUpsertedEvent.class);
         verify(outboxPort).append(any(), eq("Material"), eq(material.getId().toString()),
                 eq(MATERIAL_DETAILS_UPSERTED), eventCaptor.capture());
@@ -934,7 +1589,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(materialCaptor.getValue()).isSameAs(material);
                     assertThat(materialCaptor.getValue().getRoot()).isSameAs(root);
                 },
-                () -> verify(materialNodeRepository, never()).save(any(MaterialNode.class)),
                 () -> {
                     assertThat(root.childAt(0).getTitle()).isEqualTo("Part 1");
                     assertThat(root.childAt(1).getTitle()).isEqualTo("Part 2");
@@ -978,7 +1632,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         assertThat(material.getRoot().getVersion()).isEqualTo(3L);
         assertThat(material.getRoot().getUpdatedAt()).isEqualTo(ORIGINAL_TIME);
         verify(materialRepository, never()).save(any());
-        verify(materialNodeRepository, never()).save(any());
         verify(outboxPort, never()).append(any(), any(), any(), any(), any());
     }
 
@@ -1011,7 +1664,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         assertThat(material.getVersion()).isEqualTo(2L);
         assertThat(material.getUpdatedAt()).isEqualTo(updatedAt);
         verify(materialRepository, times(1)).save(material);
-        verify(materialNodeRepository, never()).save(any());
         verify(outboxPort, never()).append(any(), any(), any(), any(), any());
     }
 
@@ -1031,7 +1683,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         assertThat(material.getUpdatedAt()).isEqualTo(ORIGINAL_TIME);
         assertThat(material.getRoot().getUpdatedAt()).isEqualTo(ORIGINAL_TIME);
         verify(materialRepository, never()).save(any());
-        verify(materialNodeRepository, never()).save(any());
         verify(outboxPort, never()).append(any(), any(), any(), any(), any());
     }
 
@@ -1051,7 +1702,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         assertThat(material.getVersion()).isEqualTo(2L);
         assertThat(material.getRoot().getVersion()).isEqualTo(4L);
         verify(materialRepository, times(1)).save(material);
-        verify(materialNodeRepository, never()).save(any());
         var eventCaptor = forClass(MaterialDetailsUpsertedEvent.class);
         verify(outboxPort, times(1)).append(any(), eq("Material"), eq(material.getId().toString()),
                 eq(MATERIAL_DETAILS_UPSERTED), eventCaptor.capture());
@@ -1078,11 +1728,9 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     .config(Map.of("responseTimeSeconds", 30)).version(3L).updatedAt(ORIGINAL_TIME).build();
             part.addChild(question);
             root.addChild(part);
-            when(materialNodeRepository.findByParentNodeId(part.getId())).thenReturn(List.of(question));
         }
         material.attachRoot(root);
         when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findByParentNodeId(root.getId())).thenReturn(root.getChildren());
         return material;
     }
 
@@ -1100,11 +1748,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
         when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(materialNodeRepository.save(any(MaterialNode.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(materialNodeRepository.findByParentNodeId(rootNodeId)).thenReturn(List.of(part1));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(rootNodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
 
         TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
                 .materialId(materialId)
@@ -1194,23 +1837,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(part1Questions);
-        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(part2Questions);
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of(imageAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part1Question1Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part1Question2Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part1Question3Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part1Question4Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part1Question5Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part1Question6Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part1Question7Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part2Question1Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part2Question2Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part2Question3Id)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(part2Question4Id)).thenReturn(List.of(audioAsset()));
         when(materialRepository.save(any(Material.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.publishSpeakingSection(materialId);
@@ -1282,22 +1908,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(List.of(questionNode(materialId, part1QuestionId, part1NodeId, 0, "P1 Q1")));
-        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(List.of(
-                questionNode(materialId, 3008L, part2NodeId, 0, "P2 Q1"),
-                questionNode(materialId, 3009L, part2NodeId, 1, "P2 Q2"),
-                questionNode(materialId, 3010L, part2NodeId, 2, "P2 Q3"),
-                questionNode(materialId, 3011L, part2NodeId, 3, "P2 Q4")
-        ));
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(part1QuestionId)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(3008L)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(3009L)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(3010L)).thenReturn(List.of(audioAsset()));
-        when(materialAssetRepository.findByMaterialNodeId(3011L)).thenReturn(List.of(audioAsset()));
 
         assertThatThrownBy(() -> service.publishSpeakingSection(materialId))
                 .isInstanceOf(IllegalStateException.class)
@@ -1355,23 +1965,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(part1Questions);
-        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(part2Questions);
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of(imageAsset(part1NodeId)));
-        when(materialAssetRepository.findByMaterialNodeId(part1QuestionId)).thenReturn(List.of());
-        when(materialAssetRepository.findByMaterialNodeId(3021L)).thenReturn(List.of(audioAsset(3021L)));
-        when(materialAssetRepository.findByMaterialNodeId(3022L)).thenReturn(List.of(audioAsset(3022L)));
-        when(materialAssetRepository.findByMaterialNodeId(3023L)).thenReturn(List.of(audioAsset(3023L)));
-        when(materialAssetRepository.findByMaterialNodeId(3024L)).thenReturn(List.of(audioAsset(3024L)));
-        when(materialAssetRepository.findByMaterialNodeId(3025L)).thenReturn(List.of(audioAsset(3025L)));
-        when(materialAssetRepository.findByMaterialNodeId(3026L)).thenReturn(List.of(audioAsset(3026L)));
-        when(materialAssetRepository.findByMaterialNodeId(3017L)).thenReturn(List.of(audioAsset(3017L)));
-        when(materialAssetRepository.findByMaterialNodeId(3018L)).thenReturn(List.of(audioAsset(3018L)));
-        when(materialAssetRepository.findByMaterialNodeId(3019L)).thenReturn(List.of(audioAsset(3019L)));
-        when(materialAssetRepository.findByMaterialNodeId(3020L)).thenReturn(List.of(audioAsset(3020L)));
 
         assertThatThrownBy(() -> service.publishSpeakingSection(materialId))
                 .isInstanceOf(IllegalStateException.class)
@@ -1426,22 +2019,6 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         material.attachRoot(root);
 
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-        when(materialNodeRepository.findById(rootNodeId)).thenReturn(Optional.of(root));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 0)).thenReturn(Optional.of(part1));
-        when(materialNodeRepository.findByParentIdAndDisplayOrder(rootNodeId, 1)).thenReturn(Optional.of(part2));
-        when(materialNodeRepository.findByParentNodeId(part1NodeId)).thenReturn(part1Questions);
-        when(materialNodeRepository.findByParentNodeId(part2NodeId)).thenReturn(part2Questions);
-        when(materialAssetRepository.findByMaterialNodeId(part1NodeId)).thenReturn(List.of(imageAsset(part1NodeId)));
-        when(materialAssetRepository.findByMaterialNodeId(part1QuestionId)).thenReturn(List.of(audioAsset(part1QuestionId)));
-        when(materialAssetRepository.findByMaterialNodeId(3026L)).thenReturn(List.of(audioAsset(3026L)));
-        when(materialAssetRepository.findByMaterialNodeId(3027L)).thenReturn(List.of(audioAsset(3027L)));
-        when(materialAssetRepository.findByMaterialNodeId(3028L)).thenReturn(List.of(audioAsset(3028L)));
-        when(materialAssetRepository.findByMaterialNodeId(3029L)).thenReturn(List.of(audioAsset(3029L)));
-        when(materialAssetRepository.findByMaterialNodeId(3030L)).thenReturn(List.of(audioAsset(3030L)));
-        when(materialAssetRepository.findByMaterialNodeId(3031L)).thenReturn(List.of(audioAsset(3031L)));
-        when(materialAssetRepository.findByMaterialNodeId(3032L)).thenReturn(List.of(audioAsset(3032L)));
-        when(materialAssetRepository.findByMaterialNodeId(3033L)).thenReturn(List.of(audioAsset(3033L)));
-        when(materialAssetRepository.findByMaterialNodeId(3034L)).thenReturn(List.of(audioAsset(3034L)));
 
         assertThatThrownBy(() -> service.publishSpeakingSection(materialId))
                 .isInstanceOf(IllegalStateException.class)
@@ -1461,10 +2038,81 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build();
     }
 
-    private static MaterialAsset imageAsset() {
-        return MaterialAsset.builder()
-                .kind(MaterialAsset.Kind.IMAGE)
-                .storageKey("speaking/1001/part1/image/image.png")
+    private static Material persistedSpeakingScaffoldMaterial(Long materialId, String title, String description) {
+        Material material = Material.builder()
+                .id(materialId)
+                .examFamilyId(1L)
+                .title(title)
+                .description(description)
+                .status(MaterialStatus.DRAFT)
+                .version(0L)
+                .createdAt(ORIGINAL_TIME)
+                .updatedAt(ORIGINAL_TIME)
+                .build();
+
+        MaterialNode root = scaffoldNode(materialId, 9100L, null, MaterialNodeKind.SECTION, title, 0, null, Map.of());
+        MaterialNode part1 = scaffoldNode(materialId, 9101L, root.getId(), MaterialNodeKind.PART, "Part 1", 0, null, Map.of());
+        MaterialNode part2 = scaffoldNode(materialId, 9102L, root.getId(), MaterialNodeKind.PART, "Part 2", 1, null, Map.of());
+
+        part1.addChild(scaffoldNode(materialId, 9110L, part1.getId(), MaterialNodeKind.ITEM, "Question 1", 0,
+                "Part 1 question 1", Map.of("prepTimeSeconds", 15)));
+        for (int i = 1; i < 7; i++) {
+            part1.addChild(scaffoldNode(materialId, 9110L + i, part1.getId(), MaterialNodeKind.ITEM,
+                    "Question " + (i + 1), i, null, Map.of()));
+        }
+
+        part2.addChild(scaffoldNode(materialId, 9120L, part2.getId(), MaterialNodeKind.ITEM, "Question 1", 0,
+                "Part 2 question 1", Map.of()));
+        part2.addChild(scaffoldNode(materialId, 9121L, part2.getId(), MaterialNodeKind.ITEM, "Question 2", 1,
+                "Part 2 question 2", Map.of("prepTimeSeconds", 30)));
+        part2.addChild(scaffoldNode(materialId, 9122L, part2.getId(), MaterialNodeKind.ITEM, "Question 3", 2,
+                null, Map.of()));
+        part2.addChild(scaffoldNode(materialId, 9123L, part2.getId(), MaterialNodeKind.ITEM, "Question 4", 3,
+                null, Map.of()));
+
+        root.addChild(part1);
+        root.addChild(part2);
+        material.attachRoot(root);
+        return material;
+    }
+
+    private static Material persistedSpeakingScaffoldMaterialWithInitialAssets(Long materialId, String title, String description) {
+        Material material = persistedSpeakingScaffoldMaterial(materialId, title, description);
+        material.addNodeAsset(9101L, MaterialAsset.Kind.IMAGE,
+                "speaking/9100/part1/image/image.png", "cover.png", "image/png", 3L);
+        material.addNodeAsset(9110L, MaterialAsset.Kind.AUDIO,
+                "speaking/9100/part1/audio/question_1.mp3", "part1-question1.mp3", "audio/mpeg", 11L);
+        material.addNodeAsset(9120L, MaterialAsset.Kind.AUDIO,
+                "speaking/9100/part2/audio/question_1.mp3", "part2-question1.mp3", "audio/mpeg", 12L);
+        return material;
+    }
+
+    private static MaterialNode scaffoldNode(
+            Long materialId,
+            Long id,
+            Long parentNodeId,
+            MaterialNodeKind kind,
+            String title,
+            int displayOrder,
+            String transcriptText,
+            Map<String, Object> config
+    ) {
+        return MaterialNode.builder()
+                .id(id)
+                .materialId(materialId)
+                .parentNodeId(parentNodeId)
+                .kind(kind)
+                .title(title)
+                .displayOrder(displayOrder)
+                .skillId(4L)
+                .transcriptText(transcriptText)
+                .responseMode(kind == MaterialNodeKind.ITEM ? "SPOKEN" : "NONE")
+                .responseRequired(kind == MaterialNodeKind.ITEM)
+                .scoringMode("NONE")
+                .config(config)
+                .version(0L)
+                .createdAt(ORIGINAL_TIME)
+                .updatedAt(ORIGINAL_TIME)
                 .build();
     }
 
@@ -1476,10 +2124,23 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .build();
     }
 
-    private static MaterialAsset audioAsset() {
+    private static MaterialAsset imageAsset(
+            Long assetId,
+            Long nodeId,
+            String storageKey,
+            String originalFilename,
+            Long fileSizeBytes,
+            Long version
+    ) {
         return MaterialAsset.builder()
-                .kind(MaterialAsset.Kind.AUDIO)
-                .storageKey("speaking/1001/part1/audio/question_1.mp3")
+                .id(assetId)
+                .materialNodeId(nodeId)
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey(storageKey)
+                .originalFilename(originalFilename)
+                .mimeType("image/png")
+                .fileSizeBytes(fileSizeBytes)
+                .version(version)
                 .build();
     }
 
@@ -1490,5 +2151,26 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .storageKey("speaking/1001/part1/audio/question_1.mp3")
                 .build();
     }
+
+    private static MaterialAsset audioAsset(
+            Long assetId,
+            Long nodeId,
+            String storageKey,
+            String originalFilename,
+            Long fileSizeBytes,
+            Long version
+    ) {
+        return MaterialAsset.builder()
+                .id(assetId)
+                .materialNodeId(nodeId)
+                .kind(MaterialAsset.Kind.AUDIO)
+                .storageKey(storageKey)
+                .originalFilename(originalFilename)
+                .mimeType("audio/mpeg")
+                .fileSizeBytes(fileSizeBytes)
+                .version(version)
+                .build();
+    }
+
 }
 

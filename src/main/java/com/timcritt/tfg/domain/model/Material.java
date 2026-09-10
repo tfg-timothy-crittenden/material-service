@@ -192,6 +192,58 @@ public class Material {
         }
     }
 
+    public AssetChange replaceNodeAssetFile(
+            Long nodeId,
+            Long assetId,
+            String storageKey,
+            String originalFilename,
+            String mimeType,
+            Long fileSizeBytes
+    ) {
+        MaterialNode node = requireAttachedNode(nodeId);
+        MaterialAsset asset = requireAttachedAsset(node, assetId);
+        String previousStorageKey = asset.getStorageKey();
+
+        asset.replaceFile(storageKey, originalFilename, mimeType, fileSizeBytes);
+
+        incrementVersion();
+        touch();
+        return new AssetChange(previousStorageKey, asset.getStorageKey());
+    }
+
+    public AssetChange removeNodeAsset(Long nodeId, Long assetId) {
+        MaterialNode node = requireAttachedNode(nodeId);
+        MaterialAsset removedAsset = node.removeAssetById(assetId);
+
+        incrementVersion();
+        touch();
+        return new AssetChange(removedAsset.getStorageKey(), null);
+    }
+
+    public AssetChange addNodeAsset(
+            Long nodeId,
+            MaterialAsset.Kind kind,
+            String storageKey,
+            String originalFilename,
+            String mimeType,
+            Long fileSizeBytes
+    ) {
+        MaterialNode node = requireAttachedNode(nodeId);
+        MaterialAsset asset = MaterialAsset.create(
+                node.getId(),
+                kind,
+                storageKey,
+                originalFilename,
+                mimeType,
+                fileSizeBytes
+        );
+
+        node.addAsset(asset);
+        incrementVersion();
+        touch();
+        return new AssetChange(null, asset.getStorageKey());
+    }
+
     // ***************************** INTERNAL DOMAIN HELPERS *****************************
 
     private MaterialNode requireAttachedNode(Long nodeId) {
@@ -217,6 +269,22 @@ public class Material {
         }
 
         throw new IllegalArgumentException("No attached node with ID " + nodeId + " for material " + id);
+    }
+
+    private MaterialAsset requireAttachedAsset(MaterialNode node, Long assetId) {
+        if (assetId == null) {
+            throw new IllegalArgumentException("assetId cannot be null");
+        }
+
+        for (MaterialAsset asset : node.getAssets()) {
+            if (Objects.equals(assetId, asset.getId())) {
+                return asset;
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "No attached asset with ID " + assetId + " under node " + node.getId() + " for material " + id
+        );
     }
 
     private void incrementVersion() {

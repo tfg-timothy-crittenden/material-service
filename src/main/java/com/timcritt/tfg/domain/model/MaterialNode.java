@@ -84,6 +84,24 @@ public class MaterialNode {
         assets.add(asset);
     }
 
+    MaterialAsset removeAssetById(Long assetId) {
+        if (assetId == null) {
+            throw new IllegalArgumentException("assetId cannot be null");
+        }
+
+        for (Iterator<MaterialAsset> iterator = assets.iterator(); iterator.hasNext(); ) {
+            MaterialAsset asset = iterator.next();
+            if (Objects.equals(assetId, asset.getId())) {
+                iterator.remove();
+                return asset;
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "No attached asset with ID " + assetId + " under node " + id
+        );
+    }
+
     public void updateTitle(String title) {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("title cannot be blank");

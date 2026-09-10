@@ -69,4 +69,17 @@ public class MaterialNodeEntityMapper {
                 .updatedAt(domain.getUpdatedAt())
                 .build();
     }
+
+    public static MaterialNodeJpaEntity toEntity(
+            MaterialNode domain,
+            Long persistedMaterialId,
+            Long persistedParentNodeId
+    ) {
+        if (domain == null) return null;
+
+        MaterialNodeJpaEntity entity = toEntity(domain);
+        entity.setMaterialId(persistedMaterialId);
+        entity.setParentNodeId(persistedParentNodeId);
+        return entity;
+    }
 }
