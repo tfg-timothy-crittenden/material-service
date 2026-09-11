@@ -3,6 +3,7 @@ package com.timcritt.tfg.application.service.toefl;
 import com.timcritt.tfg.application.dto.toefl.SpeakingQuestionUploadCommand;
 import com.timcritt.tfg.application.port.outbound.IntegrationEventOutboxPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
+import com.timcritt.tfg.application.port.outbound.StorageCleanupPort;
 import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
@@ -20,12 +21,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,11 +41,14 @@ import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class TOEFLSpeakingMaterialCommandServiceTest {
@@ -49,12 +57,21 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
     private final MaterialRepositoryPort materialRepository = mock(MaterialRepositoryPort.class);
     private final StorageRepositoryPort storageRepositoryPort = mock(StorageRepositoryPort.class);
+    private final StorageCleanupPort storageCleanupPort = mock(StorageCleanupPort.class);
     private final IntegrationEventOutboxPort outboxPort = mock(IntegrationEventOutboxPort.class);
+    private final Supplier<UUID> replacementKeyUuidSupplier = new TestUuidSequenceSupplier(
+            "550e8400-e29b-41d4-a716-446655440000",
+            "550e8400-e29b-41d4-a716-446655440001",
+            "550e8400-e29b-41d4-a716-446655440002",
+            "550e8400-e29b-41d4-a716-446655440003"
+    );
 
     private final TOEFLSpeakingMaterialCommandService service = new TOEFLSpeakingMaterialCommandService(
             materialRepository,
             storageRepositoryPort,
-            outboxPort
+            storageCleanupPort,
+            outboxPort,
+            replacementKeyUuidSupplier
     );
 
     @Test
@@ -423,7 +440,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     }
 
     @Test
-    void deleteSpeakingSection_collectsStorageKeysFromAggregateAndDeletesThroughMaterialRepositoryBoundary() {
+    void deleteSpeakingSection_delegatesUniqueStorageCleanupRequestsAfterDeleteAndOutboxAppend() {
         Long materialId = 77L;
         Long rootNodeId = 100L;
         Long part1NodeId = 101L;
@@ -517,26 +534,27 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         service.deleteSpeakingSection(materialId);
 
-        assertAll(
-                () -> verify(materialRepository, times(1)).delete(materialId),
-                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/shared/duplicate.png"),
-                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/77/part1/audio/question_1.mp3"),
-                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/77/part2/audio/question_1.mp3"),
-                () -> verify(storageRepositoryPort, never()).deleteObject(eq("toefl"), isNull())
-        );
-
         var eventIdCaptor = forClass(java.util.UUID.class);
         var aggregateTypeCaptor = forClass(String.class);
         var aggregateIdCaptor = forClass(String.class);
         var eventTypeCaptor = forClass(String.class);
         var payloadCaptor = forClass(MaterialDeletedEvent.class);
+        var inOrder = inOrder(materialRepository, outboxPort, storageCleanupPort);
 
-        verify(outboxPort, times(1)).append(
-                eventIdCaptor.capture(),
-                aggregateTypeCaptor.capture(),
-                aggregateIdCaptor.capture(),
-                eventTypeCaptor.capture(),
-                payloadCaptor.capture());
+        assertAll(
+                () -> inOrder.verify(materialRepository, times(1)).delete(materialId),
+                () -> inOrder.verify(outboxPort, times(1)).append(
+                        eventIdCaptor.capture(),
+                        aggregateTypeCaptor.capture(),
+                        aggregateIdCaptor.capture(),
+                        eventTypeCaptor.capture(),
+                        payloadCaptor.capture()),
+                () -> inOrder.verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", "speaking/shared/duplicate.png"),
+                () -> inOrder.verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", "speaking/77/part1/audio/question_1.mp3"),
+                () -> inOrder.verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", "speaking/77/part2/audio/question_1.mp3"),
+                () -> verify(storageRepositoryPort, never()).deleteObject(eq("toefl"), any(String.class)),
+                () -> verify(storageRepositoryPort, never()).deleteObject(eq("toefl"), isNull())
+        );
 
         assertThat(eventIdCaptor.getValue()).isNotNull();
         assertThat(aggregateTypeCaptor.getValue()).isEqualTo("Material");
@@ -548,7 +566,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     }
 
     @Test
-    void updateSpeakingSection_replacesAssetAndDeletesOldStorageKey() {
+    void updateSpeakingSection_replacesAssetAndSchedulesObsoleteStorageKeyDeletionAfterCommit() {
         Long materialId = 88L;
         Long rootNodeId = 200L;
         Long part1NodeId = 201L;
@@ -586,8 +604,13 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         var uploadKeyCaptor = forClass(String.class);
         verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), uploadKeyCaptor.capture(), any());
-        assertThat(uploadKeyCaptor.getValue()).isEqualTo("speaking/88/part1/image/image.png");
-        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/88/part1/image/old-image.png");
+        String replacementKey = uploadKeyCaptor.getValue();
+        assertImmutableImageReplacementKey(replacementKey, materialId, 1, "speaking/88/part1/image/old-image.png");
+        assertThat(part1.getAssets()).singleElement().satisfies(image -> assertThat(image.getStorageKey()).isEqualTo(replacementKey));
+        verify(storageRepositoryPort, never()).deleteObject("toefl", "speaking/88/part1/image/old-image.png");
+        verify(storageRepositoryPort, never()).deleteObject("toefl", replacementKey);
+        verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", "speaking/88/part1/image/old-image.png");
+        verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", replacementKey);
         verify(materialRepository, times(1)).save(material);
     }
 
@@ -627,11 +650,16 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                         .build()))
                 .build());
 
+        var uploadKeyCaptor = forClass(String.class);
+        verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), uploadKeyCaptor.capture(), any());
+        String replacementKey = uploadKeyCaptor.getValue();
+
         assertAll(
                 () -> {
                     MaterialAsset aggregateAudio = question.getAssets().getFirst();
                     assertThat(aggregateAudio.getId()).isEqualTo(assetId);
-                    assertThat(aggregateAudio.getStorageKey()).isEqualTo(existingKey);
+                    assertImmutableAudioReplacementKey(replacementKey, materialId, 1, 1, existingKey);
+                    assertThat(aggregateAudio.getStorageKey()).isEqualTo(replacementKey);
                     assertThat(aggregateAudio.getOriginalFilename()).isEqualTo("replacement.mp3");
                     assertThat(aggregateAudio.getMimeType()).isEqualTo("audio/mpeg");
                     assertThat(aggregateAudio.getFileSizeBytes()).isEqualTo(12345L);
@@ -646,15 +674,17 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(saved).isSameAs(material);
                     assertThat(savedAudio).isSameAs(attachedAudio);
                     assertThat(savedAudio.getId()).isEqualTo(assetId);
-                    assertThat(savedAudio.getStorageKey()).isEqualTo(existingKey);
+                    assertThat(savedAudio.getStorageKey()).isEqualTo(replacementKey);
                     assertThat(savedAudio.getOriginalFilename()).isEqualTo("replacement.mp3");
                     assertThat(savedAudio.getMimeType()).isEqualTo("audio/mpeg");
                     assertThat(savedAudio.getFileSizeBytes()).isEqualTo(12345L);
                     assertThat(savedAudio.getVersion()).isEqualTo(6L);
                     assertThat(saved.getVersion()).isEqualTo(2L);
                 },
-                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(existingKey), any()),
-                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", existingKey)
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", existingKey),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", replacementKey),
+                () -> verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", existingKey),
+                () -> verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", replacementKey)
         );
     }
 
@@ -699,13 +729,18 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                         .build()))
                 .build());
 
+        var uploadKeyCaptor = forClass(String.class);
+        verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), uploadKeyCaptor.capture(), any());
+        String replacementKey = uploadKeyCaptor.getValue();
+
         assertAll(
                 () -> {
                     MaterialAsset aggregateAudio = question.getAssets().getFirst();
                     assertThat(question.getTranscriptText()).isEqualTo("Updated transcript");
                     assertThat(question.getConfig()).isEqualTo(updatedConfig);
                     assertThat(aggregateAudio.getId()).isEqualTo(assetId);
-                    assertThat(aggregateAudio.getStorageKey()).isEqualTo(existingKey);
+                    assertImmutableAudioReplacementKey(replacementKey, materialId, 1, 1, existingKey);
+                    assertThat(aggregateAudio.getStorageKey()).isEqualTo(replacementKey);
                     assertThat(aggregateAudio.getOriginalFilename()).isEqualTo("replacement.mp3");
                     assertThat(aggregateAudio.getMimeType()).isEqualTo("audio/mpeg");
                     assertThat(aggregateAudio.getFileSizeBytes()).isEqualTo(12345L);
@@ -722,7 +757,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(savedQuestion.getConfig()).isEqualTo(updatedConfig);
                     assertThat(savedAudio).isSameAs(attachedAudio);
                     assertThat(savedAudio.getId()).isEqualTo(assetId);
-                    assertThat(savedAudio.getStorageKey()).isEqualTo(existingKey);
+                    assertThat(savedAudio.getStorageKey()).isEqualTo(replacementKey);
                     assertThat(savedAudio.getOriginalFilename()).isEqualTo("replacement.mp3");
                     assertThat(savedAudio.getMimeType()).isEqualTo("audio/mpeg");
                     assertThat(savedAudio.getFileSizeBytes()).isEqualTo(12345L);
@@ -730,8 +765,10 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(saved.getVersion()).isEqualTo(4L);
                 },
                 () -> verify(materialRepository, times(1)).save(any(Material.class)),
-                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(existingKey), any()),
-                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", existingKey)
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", existingKey),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", replacementKey),
+                () -> verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", existingKey),
+                () -> verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", replacementKey)
         );
     }
 
@@ -826,10 +863,15 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                         .build())
                 .build());
 
+        var uploadKeyCaptor = forClass(String.class);
+        verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), uploadKeyCaptor.capture(), any());
+        String replacementKey = uploadKeyCaptor.getValue();
+
         assertAll(
                 () -> assertThat(part1.getAssets()).singleElement().satisfies(image -> {
                     assertThat(image.getId()).isEqualTo(imageAssetId);
-                    assertThat(image.getStorageKey()).isEqualTo(imageKey);
+                    assertImmutableImageReplacementKey(replacementKey, materialId, 1, imageKey);
+                    assertThat(image.getStorageKey()).isEqualTo(replacementKey);
                     assertThat(image.getOriginalFilename()).isEqualTo("replacement.png");
                     assertThat(image.getMimeType()).isEqualTo("image/png");
                     assertThat(image.getFileSizeBytes()).isEqualTo(222L);
@@ -843,13 +885,121 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(saved.getRoot().childAt(0).getVersion()).isEqualTo(1L);
                     assertThat(saved.getRoot().childAt(0).getAssets()).singleElement().satisfies(image -> {
                         assertThat(image.getId()).isEqualTo(imageAssetId);
-                        assertThat(image.getStorageKey()).isEqualTo(imageKey);
+                        assertThat(image.getStorageKey()).isEqualTo(replacementKey);
                         assertThat(image.getOriginalFilename()).isEqualTo("replacement.png");
                         assertThat(image.getVersion()).isEqualTo(6L);
                     });
                 },
-                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(imageKey), any()),
-                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", imageKey)
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", imageKey),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", replacementKey),
+                () -> verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", imageKey),
+                () -> verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", replacementKey)
+        );
+    }
+
+    @Test
+    void updateSpeakingSection_existingQuestionAudioReplacement_whenSaveFails_compensatesOnlyNewlyUploadedKey() {
+        Long materialId = 109L;
+        Long rootNodeId = 590L;
+        Long part1NodeId = 591L;
+        Long questionNodeId = 592L;
+        Long assetId = 6900L;
+        String existingKey = "speaking/109/part1/audio/question_1.mp3";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode question = questionNode(materialId, questionNodeId, part1NodeId, 0, "Original transcript");
+        MaterialAsset attachedAudio = audioAsset(assetId, questionNodeId, existingKey, "old-question.mp3", 1000L, 5L);
+        question.addAsset(attachedAudio);
+        part1.addChild(question);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialRepository.save(any(Material.class))).thenThrow(new IllegalStateException("db save failed"));
+
+        assertThatThrownBy(() -> service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .questions(List.of(SpeakingQuestionPartialUpdateCommand.builder()
+                        .index(0)
+                        .audio(UploadedFileCommand.builder()
+                                .originalFilename("replacement.mp3")
+                                .contentType("audio/mpeg")
+                                .size(12345L)
+                                .bytes(new byte[]{1, 2, 3})
+                                .build())
+                        .build()))
+                .build()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("db save failed");
+
+        var uploadKeyCaptor = forClass(String.class);
+        verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), uploadKeyCaptor.capture(), any());
+        String replacementKey = uploadKeyCaptor.getValue();
+
+        assertAll(
+                () -> assertImmutableAudioReplacementKey(replacementKey, materialId, 1, 1, existingKey),
+                () -> assertThat(attachedAudio.getStorageKey()).isEqualTo(replacementKey),
+                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", replacementKey),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", existingKey),
+                () -> verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", existingKey),
+                () -> verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", replacementKey)
+        );
+    }
+
+    @Test
+    void updateSpeakingSection_whenCompensationDeletionFails_preservesOriginalSaveFailure() {
+        Long materialId = 110L;
+        Long rootNodeId = 600L;
+        Long part1NodeId = 601L;
+        Long questionNodeId = 602L;
+        Long assetId = 7000L;
+        String existingKey = "speaking/110/part1/audio/question_1.mp3";
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode question = questionNode(materialId, questionNodeId, part1NodeId, 0, "Original transcript");
+        MaterialAsset attachedAudio = audioAsset(assetId, questionNodeId, existingKey, "old-question.mp3", 1000L, 5L);
+        question.addAsset(attachedAudio);
+        part1.addChild(question);
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(materialRepository.save(any(Material.class))).thenThrow(new IllegalStateException("db save failed"));
+
+        String replacementKey = "speaking/110/part1/audio/question_1/550e8400-e29b-41d4-a716-446655440000.mp3";
+        RuntimeException cleanupFailure = new RuntimeException("cleanup delete failed");
+        doThrow(cleanupFailure).when(storageRepositoryPort).deleteObject("toefl", replacementKey);
+
+        assertThatThrownBy(() -> service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .questions(List.of(SpeakingQuestionPartialUpdateCommand.builder()
+                        .index(0)
+                        .audio(UploadedFileCommand.builder()
+                                .originalFilename("replacement.mp3")
+                                .contentType("audio/mpeg")
+                                .size(12345L)
+                                .bytes(new byte[]{1, 2, 3})
+                                .build())
+                        .build()))
+                .build()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("db save failed")
+                .isNotSameAs(cleanupFailure);
+
+        assertAll(
+                () -> verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), eq(replacementKey), any()),
+                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", replacementKey),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", existingKey),
+                () -> verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", existingKey),
+                () -> verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", replacementKey)
         );
     }
 
@@ -903,7 +1053,7 @@ class TOEFLSpeakingMaterialCommandServiceTest {
     }
 
     @Test
-    void updateSpeakingSection_removePartImage_deletesAssetEntryAndStorageKey() {
+    void updateSpeakingSection_removePartImage_schedulesDuplicateObsoleteStorageKeyOnceAfterCommit() {
         Long materialId = 89L;
         Long rootNodeId = 300L;
         Long part1NodeId = 301L;
@@ -922,7 +1072,14 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .kind(MaterialAsset.Kind.IMAGE)
                 .storageKey("speaking/89/part1/image/old-image.png")
                 .build();
+        MaterialAsset duplicateImageAsset = MaterialAsset.builder()
+                .id(5002L)
+                .materialNodeId(part1NodeId)
+                .kind(MaterialAsset.Kind.IMAGE)
+                .storageKey("speaking/89/part1/image/old-image.png")
+                .build();
         part1.addAsset(imageAsset);
+        part1.addAsset(duplicateImageAsset);
 
         TOEFLSpeakingSectionUpdateCommand command = TOEFLSpeakingSectionUpdateCommand.builder()
                 .materialId(materialId)
@@ -933,7 +1090,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
 
         assertThat(part1.getAssets()).isEmpty();
         verify(materialRepository, times(1)).save(material);
-        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/89/part1/image/old-image.png");
+        verify(storageRepositoryPort, never()).deleteObject("toefl", "speaking/89/part1/image/old-image.png");
+        verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", "speaking/89/part1/image/old-image.png");
     }
 
     @Test
@@ -971,7 +1129,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(saved.getRoot().childAt(0).getVersion()).isEqualTo(1L);
                     assertThat(saved.getRoot().childAt(0).getAssets()).isEmpty();
                 },
-                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", oldKey)
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", oldKey),
+                () -> verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", oldKey)
         );
     }
 
@@ -1010,7 +1169,8 @@ class TOEFLSpeakingMaterialCommandServiceTest {
         service.updateSpeakingSection(command);
 
         assertThat(q0.getAssets()).isEmpty();
-        verify(storageRepositoryPort, times(1)).deleteObject("toefl", "speaking/90/part1/audio/old-question.mp3");
+        verify(storageRepositoryPort, never()).deleteObject("toefl", "speaking/90/part1/audio/old-question.mp3");
+        verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", "speaking/90/part1/audio/old-question.mp3");
         assertThat(material.getVersion()).isEqualTo(2L);
         verify(materialRepository, times(1)).save(material);
     }
@@ -1053,8 +1213,44 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(saved.getRoot().childAt(0).childAt(0).getVersion()).isNull();
                     assertThat(saved.getRoot().childAt(0).childAt(0).getAssets()).isEmpty();
                 },
-                () -> verify(storageRepositoryPort, times(1)).deleteObject("toefl", oldKey)
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", oldKey),
+                () -> verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", oldKey)
         );
+    }
+
+    @Test
+    void updateSpeakingSection_whenValidationFailsBeforeCleanupScheduling_doesNotRequestObsoleteDeletion() {
+        Long materialId = 108L;
+        Long rootNodeId = 580L;
+        Long part1NodeId = 581L;
+
+        Material material = Material.builder().id(materialId).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode root = MaterialNode.builder().id(rootNodeId).materialId(materialId)
+                .kind(MaterialNodeKind.SECTION).title("Material").version(1L).updatedAt(ORIGINAL_TIME).build();
+        MaterialNode part1 = MaterialNode.builder().id(part1NodeId).materialId(materialId).parentNodeId(rootNodeId)
+                .kind(MaterialNodeKind.PART).displayOrder(0).title("Part 1").version(1L).updatedAt(ORIGINAL_TIME).build();
+        part1.addAsset(imageAsset(6800L, part1NodeId, "speaking/108/part1/image/old-image.png", "cover.png", 100L, 5L));
+        root.addChild(part1);
+        material.attachRoot(root);
+
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+
+        assertThatThrownBy(() -> service.updateSpeakingSection(TOEFLSpeakingSectionUpdateCommand.builder()
+                .materialId(materialId)
+                .partImage(UploadedFileCommand.builder()
+                        .originalFilename("replacement.png")
+                        .contentType("image/png")
+                        .size(321L)
+                        .bytes(new byte[]{1, 2, 3})
+                        .build())
+                .removePartImage(true)
+                .build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("partImage and removePartImage cannot both be set");
+
+        verify(materialRepository, never()).save(any(Material.class));
+        verify(storageRepositoryPort, never()).deleteObject(eq("toefl"), any(String.class));
+        verifyNoInteractions(storageCleanupPort);
     }
 
     @Test
@@ -1141,6 +1337,10 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                         .build()))
                 .build());
 
+        var uploadKeyCaptor = forClass(String.class);
+        verify(storageRepositoryPort, times(1)).uploadObject(eq("toefl"), uploadKeyCaptor.capture(), any());
+        String replacementKey = uploadKeyCaptor.getValue();
+
         assertAll(
                 () -> {
                     var materialCaptor = forClass(Material.class);
@@ -1155,11 +1355,18 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                     assertThat(savedQuestion.getConfig()).isEqualTo(updatedConfig);
                     assertThat(savedQuestion.getAssets()).singleElement().satisfies(audio -> {
                         assertThat(audio.getId()).isEqualTo(audioAssetId);
-                        assertThat(audio.getStorageKey()).isEqualTo(audioKey);
+                        assertImmutableAudioReplacementKey(replacementKey, materialId, 1, 1, audioKey);
+                        assertThat(audio.getStorageKey()).isEqualTo(replacementKey);
                         assertThat(audio.getOriginalFilename()).isEqualTo("replacement.mp3");
                     });
                 },
-                () -> verify(materialRepository, times(1)).save(any(Material.class))
+                () -> verify(materialRepository, times(1)).save(any(Material.class)),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", imageKey),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", audioKey),
+                () -> verify(storageRepositoryPort, never()).deleteObject("toefl", replacementKey),
+                () -> verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", imageKey),
+                () -> verify(storageCleanupPort, times(1)).requestDeletion(materialId, "toefl", audioKey),
+                () -> verify(storageCleanupPort, never()).requestDeletion(materialId, "toefl", replacementKey)
         );
     }
 
@@ -2170,6 +2377,48 @@ class TOEFLSpeakingMaterialCommandServiceTest {
                 .fileSizeBytes(fileSizeBytes)
                 .version(version)
                 .build();
+    }
+
+    private static void assertImmutableImageReplacementKey(String replacementKey, Long materialId, int partNumber, String oldKey) {
+        assertThat(replacementKey)
+                .isNotEqualTo(oldKey)
+                .startsWith("speaking/" + materialId + "/part" + partNumber + "/image/")
+                .endsWith(".png")
+                .doesNotContain("old-image");
+    }
+
+    private static void assertImmutableAudioReplacementKey(
+            String replacementKey,
+            Long materialId,
+            int partNumber,
+            int questionNumber,
+            String oldKey
+    ) {
+        assertThat(replacementKey)
+                .isNotEqualTo(oldKey)
+                .startsWith("speaking/" + materialId + "/part" + partNumber + "/audio/question_" + questionNumber + "/")
+                .endsWith(".mp3")
+                .doesNotContain("old-question");
+    }
+
+    private static final class TestUuidSequenceSupplier implements Supplier<UUID> {
+        private final Deque<UUID> values;
+
+        private TestUuidSequenceSupplier(String... values) {
+            this.values = new LinkedList<>();
+            for (String value : values) {
+                this.values.add(UUID.fromString(value));
+            }
+        }
+
+        @Override
+        public UUID get() {
+            UUID next = values.pollFirst();
+            if (next == null) {
+                throw new IllegalStateException("No test UUIDs remaining");
+            }
+            return next;
+        }
     }
 
 }

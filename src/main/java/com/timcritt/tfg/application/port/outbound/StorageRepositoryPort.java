@@ -28,7 +28,8 @@ public interface StorageRepositoryPort {
      * Deletes an object from storage.
      * @param bucket the bucket name
      * @param objectKey the object key
-     * @return true if deleted, false otherwise
+     * Returns normally when the requested object-removal operation succeeds.
+     * Throws when the storage operation cannot be completed.
      */
-    boolean deleteObject(String bucket, String objectKey);
+    void deleteObject(String bucket, String objectKey);
 }

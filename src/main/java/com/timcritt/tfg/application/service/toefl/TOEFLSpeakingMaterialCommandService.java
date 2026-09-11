@@ -7,6 +7,7 @@ import com.timcritt.tfg.application.dto.toefl.TOEFLSpeakingSectionUpdateCommand;
 import com.timcritt.tfg.application.dto.toefl.UploadedFileCommand;
 import com.timcritt.tfg.application.port.outbound.IntegrationEventOutboxPort;
 import com.timcritt.tfg.application.port.outbound.MaterialRepositoryPort;
+import com.timcritt.tfg.application.port.outbound.StorageCleanupPort;
 import com.timcritt.tfg.application.port.outbound.StorageRepositoryPort;
 import com.timcritt.tfg.domain.event.MaterialDeletedEvent;
 import com.timcritt.tfg.domain.event.MaterialDetailsUpsertedEvent;
@@ -15,8 +16,9 @@ import com.timcritt.tfg.domain.model.*;
 import com.timcritt.tfg.domain.policy.toefl.ToeflSpeaking2026MaterialPolicy;
 
 import java.io.ByteArrayInputStream;
-import java.util.*;
 import java.time.Instant;
+import java.util.*;
+import java.util.function.Supplier;
 
 import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DETAILS_UPSERTED;
 import static com.timcritt.tfg.application.integration.IntegrationEventTypes.MATERIAL_DELETED;
@@ -29,15 +31,21 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
 
     private final MaterialRepositoryPort materialRepository;
     private final StorageRepositoryPort storageRepositoryPort;
+    private final StorageCleanupPort storageCleanupPort;
     private final IntegrationEventOutboxPort outboxPort;
+    private final Supplier<UUID> replacementKeyUuidSupplier;
 
     public TOEFLSpeakingMaterialCommandService(
             MaterialRepositoryPort materialRepository,
             StorageRepositoryPort storageRepositoryPort,
-            IntegrationEventOutboxPort outboxPort) {
+            StorageCleanupPort storageCleanupPort,
+            IntegrationEventOutboxPort outboxPort,
+            Supplier<UUID> replacementKeyUuidSupplier) {
         this.materialRepository = materialRepository;
         this.storageRepositoryPort = storageRepositoryPort;
+        this.storageCleanupPort = storageCleanupPort;
         this.outboxPort = outboxPort;
+        this.replacementKeyUuidSupplier = replacementKeyUuidSupplier;
     }
 
     @Override
@@ -108,15 +116,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         Long rootNodeId = material.getRootId();
         Set<String> storageKeys = collectStorageKeys(material.getRoot());
 
-        // Best-effort object-store cleanup; never fail DB delete because object cleanup failed.
-        for (String key : storageKeys) {
-            try {
-                storageRepositoryPort.deleteObject("toefl", key);
-            } catch (Exception ex) {
-                // Intentionally swallowed; stale objects can be cleaned up later.
-            }
-        }
-
         materialRepository.delete(materialId);
 
         Instant deletedAt = Instant.now();
@@ -131,6 +130,10 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                         .deletedAt(deletedAt)
                         .build()
         );
+
+        for (String key : storageKeys) {
+            storageCleanupPort.requestDeletion(materialId, "toefl", key);
+        }
     }
 
     private MaterialNode buildSectionRoot(String sectionTitle) {
@@ -409,15 +412,11 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
             throw e;
         }
 
-        // Post-success: best-effort removal of storage keys no longer referenced by this section.
+        // Post-success: defer destructive cleanup of now-obsolete keys until after commit.
         Set<String> keysToDeleteAfterSuccess = new HashSet<>(storageKeysBeforeUpdate);
         keysToDeleteAfterSuccess.removeAll(storageKeysAfterUpdate);
         for (String key : keysToDeleteAfterSuccess) {
-            try {
-                storageRepositoryPort.deleteObject("toefl", key);
-            } catch (Exception ex) {
-                // Intentionally swallowed – do NOT roll back the DB transaction over a stale object.
-            }
+            storageCleanupPort.requestDeletion(material.getId(), "toefl", key);
         }
 
         if (titlesChanged) {
@@ -490,12 +489,14 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
                 ? file.getOriginalFilename()
                 : "file";
 
-        String newKey = buildSpeakingStorageKey(
-                material.getId(),
-                partNumber,
-                kind,
-                questionNumber
-        );
+        MaterialAsset asset = node.getAssets().stream()
+                .filter(existing -> existing.getKind() == kind)
+                .findFirst()
+                .orElse(null);
+
+        String newKey = asset == null
+                ? buildSpeakingStorageKey(material.getId(), partNumber, kind, questionNumber)
+                : buildSpeakingReplacementStorageKey(material.getId(), partNumber, kind, questionNumber, file);
 
         storageRepositoryPort.uploadObject(
                 "toefl",
@@ -504,11 +505,6 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         );
 
         uploadedKeys.add(newKey);
-
-        MaterialAsset asset = node.getAssets().stream()
-                .filter(existing -> existing.getKind() == kind)
-                .findFirst()
-                .orElse(null);
 
         if (asset != null) {
             material.replaceNodeAssetFile(
@@ -531,6 +527,36 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         }
     }
 
+    private String buildSpeakingReplacementStorageKey(
+            Long materialId,
+            int partNumber,
+            MaterialAsset.Kind kind,
+            Integer questionNumber,
+            UploadedFileCommand file
+    ) {
+        if (materialId == null) {
+            throw new IllegalArgumentException("materialId is required for speaking storage keys");
+        }
+
+        UUID replacementId = Objects.requireNonNull(
+                replacementKeyUuidSupplier.get(),
+                "replacementKeyUuidSupplier returned null"
+        );
+        String extension = extractStorageExtension(file == null ? null : file.getOriginalFilename(), kind);
+        String basePath = "speaking/" + materialId + "/part" + partNumber;
+
+        if (kind == MaterialAsset.Kind.IMAGE) {
+            return basePath + "/image/" + replacementId + "." + extension;
+        }
+        if (kind == MaterialAsset.Kind.AUDIO) {
+            if (questionNumber == null) {
+                throw new IllegalArgumentException("questionNumber is required for speaking audio keys");
+            }
+            return basePath + "/audio/question_" + questionNumber + "/" + replacementId + "." + extension;
+        }
+        throw new IllegalArgumentException("Unsupported speaking asset kind: " + kind);
+    }
+
     private String buildSpeakingStorageKey(Long materialId, int partNumber, MaterialAsset.Kind kind, Integer questionNumber) {
         if (materialId == null) {
             throw new IllegalArgumentException("materialId is required for speaking storage keys");
@@ -548,8 +574,40 @@ public class TOEFLSpeakingMaterialCommandService implements TOEFLSpeakingMateria
         throw new IllegalArgumentException("Unsupported speaking asset kind: " + kind);
     }
 
+    private String extractStorageExtension(String originalFilename, MaterialAsset.Kind kind) {
+        if (!hasText(originalFilename)) {
+            return defaultStorageExtension(kind);
+        }
+
+        String normalizedFilename = originalFilename.replace('\\', '/');
+        int lastSeparator = normalizedFilename.lastIndexOf('/');
+        String leafName = lastSeparator >= 0
+                ? normalizedFilename.substring(lastSeparator + 1)
+                : normalizedFilename;
+        int lastDot = leafName.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == leafName.length() - 1) {
+            return defaultStorageExtension(kind);
+        }
+
+        String extension = leafName.substring(lastDot + 1).trim().toLowerCase(Locale.ROOT);
+        if (extension.isEmpty() || !extension.matches("[a-z0-9]+")) {
+            return defaultStorageExtension(kind);
+        }
+        return extension;
+    }
+
+    private String defaultStorageExtension(MaterialAsset.Kind kind) {
+        if (kind == MaterialAsset.Kind.IMAGE) {
+            return "png";
+        }
+        if (kind == MaterialAsset.Kind.AUDIO) {
+            return "mp3";
+        }
+        throw new IllegalArgumentException("Unsupported speaking asset kind: " + kind);
+    }
+
     private Set<String> collectStorageKeys(MaterialNode rootNode) {
-        Set<String> keys = new HashSet<>();
+        Set<String> keys = new LinkedHashSet<>();
         if (rootNode == null) {
             return keys;
         }

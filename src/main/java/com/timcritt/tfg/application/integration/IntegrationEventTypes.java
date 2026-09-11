@@ -6,6 +6,8 @@ public final class IntegrationEventTypes {
             "material.details.upserted.v1";
     public static final String MATERIAL_DELETED =
             "material.deleted.v1";
+    public static final String STORAGE_OBJECT_DELETE_REQUESTED =
+            "storage.object.delete.requested.v1";
 
     private IntegrationEventTypes() {
     }

@@ -102,7 +102,7 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
     }
 
     @Override
-    public boolean deleteObject(String bucket, String objectKey) {
+    public void deleteObject(String bucket, String objectKey) {
         try {
             minioClient.removeObject(
                     RemoveObjectArgs.builder()
@@ -110,9 +110,8 @@ public class MinioStorageRepositoryAdapter implements StorageRepositoryPort {
                             .object(objectKey)
                             .build()
             );
-            return true;
         } catch (Exception e) {
-            return false;
+            throw new RuntimeException("Failed to delete storage object: " + objectKey, e);
         }
     }
 }
